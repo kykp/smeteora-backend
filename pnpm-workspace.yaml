@@ -1,2 +1,6 @@
 packages:
-  - "packages/*"
+  - 'packages/*'
+
+# esbuild — транзитивная зависимость tsx и vitest, безопасно разрешаем postinstall-скрипт
+allowBuilds:
+  esbuild: true

@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import {
   serializerCompiler,
   validatorCompiler,
@@ -49,7 +49,7 @@ export const buildApp = async (config: Config): Promise<FastifyInstance> => {
 
   app.decorate('config', config);
 
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: FastifyError, request, reply) => {
     const status = error.statusCode ?? 500;
     const isServerError = status >= 500;
 
@@ -63,13 +63,12 @@ export const buildApp = async (config: Config): Promise<FastifyInstance> => {
     void reply.status(status).send({
       error: {
         code: isServerError ? 'internal_error' : (error.code ?? 'bad_request'),
-        message:
-          isServerError && isProd ? 'Внутренняя ошибка сервера' : error.message,
+        message: isServerError && isProd ? 'Внутренняя ошибка сервера' : error.message,
       },
     });
   });
 
-  app.setNotFoundHandler((request, reply) => {
+  app.setNotFoundHandler((_request, reply) => {
     void reply.status(404).send({
       error: { code: 'not_found', message: 'Ресурс не найден' },
     });
