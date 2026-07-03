@@ -8,3 +8,4 @@ export * from './sessions.js';
 export * from './invitations.js';
 export * from './api-keys.js';
 export * from './audit-log.js';
+export * from './projects.js';

@@ -12,6 +12,7 @@ import authPlugin from './plugins/auth.js';
 import withCompanyContextPlugin from './plugins/with-company-context.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './modules/auth/routes.js';
+import { projectsRoutes } from './modules/projects/routes.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -109,6 +110,7 @@ export const buildApp = async (config: Config): Promise<FastifyInstance> => {
   await app.register(
     async (v1) => {
       await v1.register(authRoutes, { prefix: '/auth' });
+      await v1.register(projectsRoutes, { prefix: '/projects' });
     },
     { prefix: API_V1_PREFIX },
   );

@@ -2,6 +2,13 @@ node_modules/
 dist/
 coverage/
 
+# Артефакты случайной компиляции внутри исходников shared-пакетов.
+# Собранные версии живут только в dist/. Если tsc/IDE случайно эмитнёт .js
+# рядом с .ts — git их не подхватит.
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+
 .env
 .env.local
 .env.*.local

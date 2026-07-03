@@ -15,6 +15,13 @@
       "when": 1783085700000,
       "tag": "0001_relax_rls_memberships_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783088339690,
+      "tag": "0002_light_invaders",
+      "breakpoints": true
     }
   ]
 }

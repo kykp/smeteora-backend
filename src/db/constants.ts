@@ -9,6 +9,9 @@ export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];
 export const INVITATION_STATUSES = ['pending', 'accepted', 'revoked', 'expired'] as const;
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 
+export const PROJECT_STATUSES = ['draft', 'active', 'archived'] as const;
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+
 // Иерархия ролей: чем выше индекс — тем больше прав.
 // Используется для проверки "role >= required" в requireRole preHandler.
 export const ROLE_RANK: Readonly<Record<Role, number>> = Object.freeze({

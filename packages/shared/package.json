@@ -11,5 +11,8 @@
   },
   "scripts": {
     "type-check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "zod": "^3.24.1"
   }
 }
