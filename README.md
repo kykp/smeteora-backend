@@ -15,6 +15,16 @@ Fastify + TypeScript + PostgreSQL бэкенд для **Smeteora** — SPA-см�
 ```bash
 pnpm install
 cp .env.example .env
+
+# Postgres 16 (dev на :5442, тест на :5433). Первый старт создаёт роли БД:
+# smeteora_migrator, smeteora_app, smeteora_platform_editor.
+pnpm db:up
+
+# Применить миграции (использует роль smeteora_migrator).
+pnpm db:migrate
+pnpm db:migrate:test
+
+# Запустить сервер.
 pnpm dev
 ```
 
@@ -25,17 +35,28 @@ curl http://localhost:3000/healthz
 # → {"status":"ok","uptime":1.234,"version":"0.0.1"}
 ```
 
+Тесты (интеграционные, против реальной Postgres):
+
+```bash
+pnpm test
+```
+
 ## Скрипты
 
-| Скрипт            | Что делает                            |
-| ----------------- | ------------------------------------- |
-| `pnpm dev`        | Fastify через `tsx watch`             |
-| `pnpm build`      | tsc сборка в `dist/`                  |
-| `pnpm start`      | production запуск из `dist/`          |
-| `pnpm lint`       | ESLint, ноль предупреждений           |
-| `pnpm type-check` | `tsc --noEmit`                        |
-| `pnpm format`     | Prettier                              |
-| `pnpm test`       | Vitest (интеграционные, реальная БД)  |
+| Скрипт                 | Что делает                              |
+| ---------------------- | --------------------------------------- |
+| `pnpm dev`             | Fastify через `tsx watch`               |
+| `pnpm build`           | tsc сборка в `dist/`                    |
+| `pnpm start`           | production запуск из `dist/`            |
+| `pnpm lint`            | ESLint, ноль предупреждений             |
+| `pnpm type-check`      | `tsc --noEmit`                          |
+| `pnpm format`          | Prettier                                |
+| `pnpm test`            | Vitest (интеграционные, реальная БД)    |
+| `pnpm db:up`           | Postgres dev+test через docker compose  |
+| `pnpm db:down`         | Остановить контейнеры Postgres          |
+| `pnpm db:generate`     | Сгенерировать миграцию по Drizzle-схеме |
+| `pnpm db:migrate`      | Применить миграции к dev БД             |
+| `pnpm db:migrate:test` | То же для тестовой БД                   |
 
 ## Структура
 

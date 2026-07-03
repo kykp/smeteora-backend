@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smeteora-postgres
+    restart: unless-stopped
+    # 5442 вместо 5432: у пользователя на 5432 живут другие проектные контейнеры.
+    ports:
+      - '5442:5432'
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smeteora}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-postgres}
+      # ── пароли для сервисных ролей (используются init-скриптами ниже) ──
+      SMETEORA_APP_PASSWORD: ${SMETEORA_APP_PASSWORD:-app_dev_password}
+      SMETEORA_MIGRATOR_PASSWORD: ${SMETEORA_MIGRATOR_PASSWORD:-migrator_dev_password}
+      SMETEORA_PLATFORM_EDITOR_PASSWORD: ${SMETEORA_PLATFORM_EDITOR_PASSWORD:-platform_dev_password}
+    volumes:
+      - smeteora_pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_ADMIN_USER:-postgres} -d ${POSTGRES_DB:-smeteora}']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  # Отдельная база для интеграционных тестов — чтобы прод-схему в dev не портить.
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: smeteora-postgres-test
+    restart: unless-stopped
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_DB: smeteora_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      SMETEORA_APP_PASSWORD: app_test_password
+      SMETEORA_MIGRATOR_PASSWORD: migrator_test_password
+      SMETEORA_PLATFORM_EDITOR_PASSWORD: platform_test_password
+    volumes:
+      - smeteora_pgdata_test:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d smeteora_test']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  smeteora_pgdata:
+  smeteora_pgdata_test:

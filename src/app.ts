@@ -5,6 +5,7 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 import { type Config } from './config.js';
+import dbPlugin from './plugins/db.js';
 import { healthRoutes } from './routes/health.js';
 
 declare module 'fastify' {
@@ -74,6 +75,7 @@ export const buildApp = async (config: Config): Promise<FastifyInstance> => {
     });
   });
 
+  await app.register(dbPlugin);
   await app.register(healthRoutes);
 
   return app;

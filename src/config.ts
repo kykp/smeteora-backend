@@ -16,6 +16,7 @@ const configSchema = z.object({
         .map((s) => s.trim())
         .filter((s) => s.length > 0),
     ),
+  DATABASE_URL: z.string().url(),
 });
 
 export type Config = Readonly<z.infer<typeof configSchema>> & { readonly version: string };

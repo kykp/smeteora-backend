@@ -7,7 +7,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.{test,spec}.ts', 'packages/**/*.{test,spec}.ts'],
+    include: [
+      'src/**/*.{test,spec}.ts',
+      'packages/**/*.{test,spec}.ts',
+      'test/**/*.{test,spec}.ts',
+    ],
     globals: false,
     testTimeout: 30_000,
   },

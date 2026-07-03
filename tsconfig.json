@@ -33,6 +33,6 @@
     "sourceMap": true,
     "removeComments": false
   },
-  "include": ["src/**/*", "packages/shared/src/**/*", "vitest.config.ts"],
+  "include": ["src/**/*", "packages/shared/src/**/*", "test/**/*", "vitest.config.ts"],
   "exclude": ["node_modules", "dist", "coverage"]
 }

@@ -62,10 +62,10 @@ Session хранит `active_membership_id`. JOIN на `memberships` → `status
 На каждом эндпоинте декларативно указана минимальная роль:
 
 ```ts
-app.get('/api/v1/projects',        { preHandler: requireRole('viewer') }, handler);
-app.post('/api/v1/projects',       { preHandler: requireRole('member') }, handler);
+app.get('/api/v1/projects', { preHandler: requireRole('viewer') }, handler);
+app.post('/api/v1/projects', { preHandler: requireRole('member') }, handler);
 app.delete('/api/v1/projects/:id', { preHandler: requireRole('admin') }, handler);
-app.post('/api/v1/company/billing',{ preHandler: requireRole('owner') }, handler);
+app.post('/api/v1/company/billing', { preHandler: requireRole('owner') }, handler);
 ```
 
 Иерархия: `owner > admin > member > viewer`. `requireRole('member')` пропускает member/admin/owner, отсекает viewer → `403`.
@@ -78,15 +78,16 @@ app.post('/api/v1/company/billing',{ preHandler: requireRole('owner') }, handler
 
 ### RLS и транзакция на каждый запрос
 
-Каждый запрос к доменным таблицам обёрнут в транзакцию, в которой первым делом выставляется контекст компании:
+Каждый запрос к доменным таблицам обёрнут в транзакцию, в которой первым делом выставляется контекст компании. Реализация — `runInCompanyContext(db, companyId, fn)` в `src/plugins/with-company-context.ts`:
 
 ```ts
-await db.transaction(async (tx) => {
-  await tx.execute(sql`SET LOCAL app.current_company_id = ${ctx.companyId}::uuid`);
+await runInCompanyContext(app.db, ctx.companyId, async (tx) => {
   // все дальнейшие запросы в этой транзакции автоматически фильтруются RLS
   return projectRepo.list(tx);
 });
 ```
+
+Под капотом: `db.transaction` + `SELECT set_config('app.current_company_id', $1, true)` — параметр `is_local=true` эквивалентен `SET LOCAL`, действует до конца транзакции. `current_setting('app.current_company_id', true)` в RLS-политиках возвращает **пустую строку** если контекст не установлен (не NULL!), поэтому политики используют `NULLIF(..., '')::uuid` — без этого cast `''::uuid` падает с `22P02`.
 
 Механика реализована как Fastify-плагин `withCompanyContext`, вешается на `preHandler` защищённых роутов. Хендлер получает `request.tx` и работает через него.
 
@@ -138,14 +139,14 @@ sessions
 
 **Сценарии отзыва — все покрыты автоматически:**
 
-| Событие                          | Механика                                                          |
-| -------------------------------- | ----------------------------------------------------------------- |
-| Юзер logout                      | `UPDATE sessions SET revoked_at=now() WHERE id=?`                 |
-| Смена пароля                     | `UPDATE sessions SET revoked_at=now() WHERE user_id=?`            |
-| Owner уволил сотрудника          | `UPDATE memberships SET status='disabled'` — Гейт 2 отсекает      |
-| Ручной отзыв конкретной сессии   | `UPDATE sessions SET revoked_at=now() WHERE id=?`                 |
-| Company удалена                  | Cascade через `memberships` → sessions невалидны                  |
-| Session протухла                 | `expires_at < now()` — Гейт 1                                     |
+| Событие                        | Механика                                                     |
+| ------------------------------ | ------------------------------------------------------------ |
+| Юзер logout                    | `UPDATE sessions SET revoked_at=now() WHERE id=?`            |
+| Смена пароля                   | `UPDATE sessions SET revoked_at=now() WHERE user_id=?`       |
+| Owner уволил сотрудника        | `UPDATE memberships SET status='disabled'` — Гейт 2 отсекает |
+| Ручной отзыв конкретной сессии | `UPDATE sessions SET revoked_at=now() WHERE id=?`            |
+| Company удалена                | Cascade через `memberships` → sessions невалидны             |
+| Session протухла               | `expires_at < now()` — Гейт 1                                |
 
 **Cleanup** протухших/отозванных строк — фоновой джобой (pg-boss или простой interval'ом в бэкапнутый инстанс), раз в час удаляет `revoked_at < now() - interval '30 days' OR expires_at < now() - interval '7 days'`.
 
@@ -324,7 +325,11 @@ src/
 
 ```ts
 interface FileStorage {
-  save(key: string, data: Buffer | Readable, meta?: { contentType?: string }): Promise<{ key: string }>;
+  save(
+    key: string,
+    data: Buffer | Readable,
+    meta?: { contentType?: string },
+  ): Promise<{ key: string }>;
   get(key: string): Promise<Readable>;
   delete(key: string): Promise<void>;
   exists(key: string): Promise<boolean>;
@@ -427,6 +432,20 @@ interface FileStorage {
 - `process.env` больше нигде в коде не читается напрямую — только через `app.config`.
 
 ---
+
+## Работа с БД в разработке
+
+- **Локальный Postgres** — через `docker compose up -d postgres postgres-test`. Основная БД на порту 5442 (5432 занят другими проектами пользователя), тестовая на 5433.
+- **Миграции запускаются под ролью `smeteora_migrator`** (BYPASSRLS + CREATEDB). Приложение работает под `smeteora_app` (без BYPASSRLS) — гарантия что баг в SQL не сможет обойти RLS.
+- `DATABASE_URL` в env — обязательно указывает на app-роль. `DATABASE_URL_MIGRATOR` — отдельная переменная, только для скриптов миграции.
+- **Добавляешь новую доменную таблицу — обязательно:**
+  1. `company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE`
+  2. Индекс на `company_id`
+  3. `created_at`, `updated_at` с триггером `set_updated_at()`
+  4. `deleted_at timestamptz` + partial index `WHERE deleted_at IS NULL` (если soft-delete применим)
+  5. `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` + политика с `NULLIF(current_setting('app.current_company_id', true), '')::uuid`
+  6. `GRANT SELECT, INSERT, UPDATE, DELETE ON <table> TO smeteora_app`
+  7. Интеграционный тест cross-tenant isolation по образу `test/rls-isolation.test.ts`
 
 ## Миграции — forward-only
 
