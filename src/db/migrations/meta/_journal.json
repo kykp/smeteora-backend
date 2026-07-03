@@ -8,6 +8,13 @@
       "when": 1783084402343,
       "tag": "0000_gorgeous_morbius",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783085700000,
+      "tag": "0001_relax_rls_memberships_sessions",
+      "breakpoints": true
     }
   ]
 }

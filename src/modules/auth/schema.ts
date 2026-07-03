@@ -1,0 +1,75 @@
+import { z } from 'zod';
+import { ROLES } from '../../db/constants.js';
+
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 200;
+const EMAIL_MAX_LENGTH = 254;
+const COMPANY_NAME_MIN = 2;
+const COMPANY_NAME_MAX = 200;
+const USER_NAME_MAX = 200;
+
+const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(EMAIL_MAX_LENGTH)
+  .email('Некорректный email');
+
+const passwordSchema = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, `Пароль должен быть ≥ ${PASSWORD_MIN_LENGTH} символов`)
+  .max(PASSWORD_MAX_LENGTH);
+
+// ── Register ──
+
+export const registerBodySchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  companyName: z.string().trim().min(COMPANY_NAME_MIN).max(COMPANY_NAME_MAX),
+  userName: z.string().trim().min(1).max(USER_NAME_MAX).optional(),
+});
+export type RegisterBody = z.infer<typeof registerBodySchema>;
+
+// ── Login ──
+
+export const loginBodySchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+});
+export type LoginBody = z.infer<typeof loginBodySchema>;
+
+// ── Switch company ──
+
+export const switchCompanyBodySchema = z.object({
+  membershipId: z.string().uuid(),
+});
+export type SwitchCompanyBody = z.infer<typeof switchCompanyBodySchema>;
+
+// ── Responses ──
+
+// Общий ответ на успешный auth-flow — что бы клиент не путался в форматах.
+// company_id наружу НЕ отдаём (нельзя догадываться о существовании чужих компаний).
+export const authUserResponseSchema = z.object({
+  user: z.object({
+    id: z.string().uuid(),
+    email: z.string(),
+    name: z.string().nullable(),
+  }),
+  company: z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+  }),
+  role: z.enum(ROLES),
+  memberships: z.array(
+    z.object({
+      id: z.string().uuid(),
+      companyId: z.string().uuid(),
+      companyName: z.string(),
+      role: z.enum(ROLES),
+      isActive: z.boolean(),
+    }),
+  ),
+});
+export type AuthUserResponse = z.infer<typeof authUserResponseSchema>;
+
+export const okResponseSchema = z.object({ ok: z.literal(true) });

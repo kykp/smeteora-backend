@@ -36,6 +36,11 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'error',
       'no-console': ['error', { allow: ['warn', 'error'] }],
       eqeqeq: ['error', 'always', { null: 'ignore' }],
+      // В проекте принято `type X = { ... }` вместо `interface`, для единообразия.
+      // См. CLAUDE.md → секция TypeScript.
+      '@typescript-eslint/consistent-type-definitions': 'off',
+      // Разрешаем и `T[]` и `Array<T>` — оба валидны, зависит от читаемости.
+      '@typescript-eslint/array-type': 'off',
     },
   },
   prettier,

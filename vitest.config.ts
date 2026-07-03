@@ -14,6 +14,13 @@ export default defineConfig({
     ],
     globals: false,
     testTimeout: 30_000,
+    // Интеграционные тесты бьют в общую тестовую БД. Параллельные файлы держат
+    // коннекты одновременно, из-за чего TRUNCATE ловит deadlock. Гоняем в один поток.
+    fileParallelism: false,
+    pool: 'forks',
+    poolOptions: {
+      forks: { singleFork: true },
+    },
   },
   resolve: {
     alias: {

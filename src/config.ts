@@ -17,6 +17,14 @@ const configSchema = z.object({
         .filter((s) => s.length > 0),
     ),
   DATABASE_URL: z.string().url(),
+
+  // ── Sessions ──
+  // openssl rand -hex 32 → 64 hex-символа = 256 бит.
+  SESSION_SECRET: z.string().min(32, 'SESSION_SECRET должен быть ≥ 32 символов'),
+  SESSION_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  // Домен для cookie. В dev — не задан (пустой), значит cookie работает только на текущем host.
+  // В prod — например ".smeteora.ru" чтобы поделиться между api.smeteora.ru и app.smeteora.ru.
+  COOKIE_DOMAIN: z.string().optional(),
 });
 
 export type Config = Readonly<z.infer<typeof configSchema>> & { readonly version: string };

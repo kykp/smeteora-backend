@@ -1,54 +1,121 @@
-import { type FastifyRequest, type onRequestAsyncHookHandler } from 'fastify';
+import { type FastifyPluginAsync, type onRequestAsyncHookHandler } from 'fastify';
+import fp from 'fastify-plugin';
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type pg from 'pg';
+import * as schema from '../db/schema/index.js';
 import { type Db } from '../db/client.js';
 import { setCompanyContext } from '../db/rls.js';
+import { UnauthorizedError } from '../lib/errors.js';
 
+// request.tx — транзакция домена: держит один pg-client в BEGIN/COMMIT
+// на всё время обработки запроса. Открывается withCompanyContext preHandler'ом,
+// закрывается onResponse-хуком (COMMIT) или onError (ROLLBACK).
 declare module 'fastify' {
   interface FastifyRequest {
-    // Транзакция домена: withCompanyContext открывает её, ставит SET LOCAL app.current_company_id,
-    // хендлер работает через неё, onSend её коммитит (или rollback при ошибке).
     tx?: Db;
-    // Аутентификационный контекст. Заполняется auth-плагином (следующий инкремент).
-    ctx?: {
-      userId: string;
-      membershipId: string;
-      companyId: string;
-      role: string;
-    };
+  }
+  interface FastifyInstance {
+    // Готовый preHandler: требует request.ctx (auth должен отработать раньше),
+    // открывает tx под ctx.companyId, кладёт в request.tx.
+    withCompanyContext: onRequestAsyncHookHandler;
   }
 }
 
-// Фабрика preHandler'ов, оборачивающих запрос в транзакцию с контекстом компании.
-// Использовать в route options: { preHandler: withCompanyContext(app) }.
-//
-// Требование: request.ctx уже заполнен (auth-плагин отработал раньше).
-// Без ctx — 500, потому что это программерская ошибка (композиция плагинов).
-export const withCompanyContext = (): onRequestAsyncHookHandler => {
-  return async function withCompanyContextHook(this, request: FastifyRequest) {
-    const ctx = request.ctx;
-    if (!ctx) {
-      request.log.error(
-        'withCompanyContext вызван без request.ctx — auth-плагин должен отработать раньше',
-      );
-      throw new Error('missing_auth_context');
-    }
+// Внутренние ключи request — хранят живой pg client + коммит/rollback колбеки,
+// не публичны в FastifyRequest.
+const CLIENT_KEY = Symbol('smt.pg.client');
+const RELEASED_KEY = Symbol('smt.pg.released');
 
-    // Открываем транзакцию, ставим контекст, пробрасываем tx в request.
-    // Транзакция должна закрыться в onResponse — обёрнём это ниже,
-    // но простейший вариант для MVP: закрывать через reply hook.
-    //
-    // Промежуточное решение: делаем транзакцию через ручной BEGIN/COMMIT на пуле,
-    // потому что drizzle.transaction принимает callback, а нам нужно держать tx
-    // на всё время обработки запроса.
-    //
-    // Реализация — в следующем инкременте вместе с auth. Здесь оставлен интерфейс
-    // и заглушка чтобы дизайн был явно виден.
-
-    // TODO(auth-mvp): реализация ручного BEGIN/SET LOCAL/COMMIT-on-response.
-    // Для db-foundation достаточно самой обёртки runInCompanyContext ниже, которую
-    // используют юнит-тесты и будущие сервисы.
-    await Promise.resolve();
-  };
+type InternalReq = {
+  [CLIENT_KEY]?: pg.PoolClient;
+  [RELEASED_KEY]?: boolean;
 };
+
+const withCompanyContextPlugin: FastifyPluginAsync = async (app) => {
+  // Достаём пул из низкоуровневого клиента. Приложение может ходить в db через
+  // Drizzle с пулом (для чтения), но домен-транзакции требуют явного соединения,
+  // держим его через .connect().
+  //
+  // Пул уже создан db-плагином. Достаём его через app.db.
+  // Drizzle instance держит ссылку на pg-Pool в свойстве .$client.
+  const getPool = (): pg.Pool => {
+    const client = (app.db as unknown as { $client: pg.Pool }).$client;
+    if (!client) throw new Error('db plugin не инициализирован');
+    return client;
+  };
+
+  const withCompanyContext: onRequestAsyncHookHandler = async (request) => {
+    const ctx = request.ctx;
+    if (!ctx) throw new UnauthorizedError();
+
+    const client = await getPool().connect();
+    const internal = request as unknown as InternalReq;
+    internal[CLIENT_KEY] = client;
+    internal[RELEASED_KEY] = false;
+
+    try {
+      await client.query('BEGIN');
+      const tx: Db = drizzle(client, { schema }) as unknown as Db;
+      await setCompanyContext(tx, ctx.companyId);
+      request.tx = tx;
+    } catch (err) {
+      // Не смогли открыть транзакцию — откатим и вернём клиент в пул.
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ROLLBACK может сам упасть если connection битый — ничего не делаем,
+        // release ниже вернёт коннект в пул с force=true.
+      }
+      client.release(true);
+      internal[RELEASED_KEY] = true;
+      throw err;
+    }
+  };
+
+  // COMMIT + release после успешного ответа.
+  app.addHook('onResponse', async (request) => {
+    const internal = request as unknown as InternalReq;
+    const client = internal[CLIENT_KEY];
+    if (!client || internal[RELEASED_KEY]) return;
+
+    try {
+      await client.query('COMMIT');
+    } catch (err) {
+      request.log.error({ err }, 'ошибка при COMMIT доменной транзакции');
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // см. выше — release с force=true покроет.
+      }
+    } finally {
+      client.release();
+      internal[RELEASED_KEY] = true;
+    }
+  });
+
+  // ROLLBACK + release при ошибке.
+  app.addHook('onError', async (request) => {
+    const internal = request as unknown as InternalReq;
+    const client = internal[CLIENT_KEY];
+    if (!client || internal[RELEASED_KEY]) return;
+
+    try {
+      await client.query('ROLLBACK');
+    } catch (err) {
+      request.log.warn({ err }, 'ошибка при ROLLBACK доменной транзакции');
+    } finally {
+      client.release();
+      internal[RELEASED_KEY] = true;
+    }
+  });
+
+  app.decorate('withCompanyContext', withCompanyContext);
+};
+
+export default fp(withCompanyContextPlugin, {
+  name: 'with-company-context',
+  dependencies: ['db'],
+});
 
 // Хелпер для использования вне HTTP (тесты, background jobs, скрипты миграции данных):
 // открывает транзакцию, ставит контекст компании, выполняет callback, коммитит.
@@ -59,9 +126,9 @@ export const runInCompanyContext = async <T>(
   fn: (tx: Db) => Promise<T>,
 ): Promise<T> => {
   return db.transaction(async (tx) => {
-    await setCompanyContext(tx, companyId);
-    return fn(tx);
-  });
+    await setCompanyContext(tx as unknown as Db, companyId);
+    return fn(tx as unknown as Db);
+  }) as Promise<T>;
 };
 
 // Хелпер для системных запросов (auth flow, миграция данных) без контекста компании.
@@ -71,5 +138,9 @@ export const runWithoutCompanyContext = async <T>(
   db: Db,
   fn: (tx: Db) => Promise<T>,
 ): Promise<T> => {
-  return db.transaction((tx) => fn(tx));
+  return db.transaction((tx) => fn(tx as unknown as Db)) as Promise<T>;
 };
+
+// Экспорт исходной transactionless Db-обёртки: сам объект NodePgDatabase.
+// Внутри используем в generics ниже.
+export type _NodePgDb = NodePgDatabase<typeof schema>;
