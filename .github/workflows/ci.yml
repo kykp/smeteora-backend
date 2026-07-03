@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Отменяем прошлый run на ту же ветку — экономит минуты и время фидбека.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: lint + type-check + test + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Postgres 16 как service container. postgres/postgres — суперюзер контейнера,
+    # им дальше создаём три сервисные роли (migrator/app/platform_editor) — те же
+    # что и в docker-compose. Тесты бьют в эту же БД под ролью smeteora_app.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: smeteora_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d smeteora_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      # Приложение работает под smeteora_app (без BYPASSRLS) — как в проде.
+      DATABASE_URL_TEST: postgresql://smeteora_app:app_test_password@localhost:5432/smeteora_test
+      # Миграции идут под smeteora_migrator (с BYPASSRLS) — иначе RLS-политики
+      # не дадут создать/пересоздать таблицы.
+      DATABASE_URL_TEST_MIGRATOR: postgresql://smeteora_migrator:migrator_test_password@localhost:5432/smeteora_test
+      # buildTestApp хардкодит SESSION_SECRET — но on-purpose держим тут для явности,
+      # если понадобится запустить pnpm dev/start в CI.
+      SESSION_SECRET: ci_secret_at_least_32_characters_long_ok
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Создаём сервисные роли БД. Эквивалент db/init/00-roles.sh, но с CI-паролями
+      # из DATABASE_URL_TEST/DATABASE_URL_TEST_MIGRATOR выше.
+      # ubuntu-latest содержит psql (postgresql-client) из коробки — доп-установка
+      # не нужна.
+      - name: Prepare DB roles
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d smeteora_test <<'EOSQL'
+            CREATE ROLE smeteora_migrator
+              WITH LOGIN PASSWORD 'migrator_test_password' CREATEDB BYPASSRLS;
+            CREATE ROLE smeteora_app
+              WITH LOGIN PASSWORD 'app_test_password';
+            CREATE ROLE smeteora_platform_editor
+              WITH LOGIN PASSWORD 'platform_test_password' BYPASSRLS;
+
+            ALTER DATABASE smeteora_test OWNER TO smeteora_migrator;
+
+            GRANT CONNECT ON DATABASE smeteora_test TO smeteora_app;
+            GRANT CONNECT ON DATABASE smeteora_test TO smeteora_platform_editor;
+          EOSQL
+
+      - name: Apply migrations
+        run: pnpm db:migrate:test
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm type-check
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

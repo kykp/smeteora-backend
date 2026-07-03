@@ -1,5 +1,7 @@
 # Smeteora Backend
 
+[![CI](https://github.com/kykp/smeteora-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/kykp/smeteora-backend/actions/workflows/ci.yml)
+
 Fastify + TypeScript + PostgreSQL бэкенд для **Smeteora** — SPA-сметчика для строительных бригад.
 
 Фронт: [smeteora](https://github.com/kykp/smeteora) (React 19 + Vite + FSD).
