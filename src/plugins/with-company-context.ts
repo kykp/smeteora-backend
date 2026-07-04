@@ -72,11 +72,15 @@ const withCompanyContextPlugin: FastifyPluginAsync = async (app) => {
     }
   };
 
-  // COMMIT + release после успешного ответа.
-  app.addHook('onResponse', async (request) => {
+  // COMMIT + release ДО отправки response — onSend хук async блокирует
+  // отправку до завершения. Это гарантирует что клиент увидит изменения
+  // сразу в следующем запросе (в fastify.inject тестах это критично:
+  // onResponse хук запускается ПОСЛЕ резолва inject-промиса, из-за чего
+  // COMMIT первого запроса и BEGIN следующего гоняются под нагрузкой).
+  app.addHook('onSend', async (request, _reply, payload) => {
     const internal = request as unknown as InternalReq;
     const client = internal[CLIENT_KEY];
-    if (!client || internal[RELEASED_KEY]) return;
+    if (!client || internal[RELEASED_KEY]) return payload;
 
     try {
       await client.query('COMMIT');
@@ -85,12 +89,16 @@ const withCompanyContextPlugin: FastifyPluginAsync = async (app) => {
       try {
         await client.query('ROLLBACK');
       } catch {
-        // см. выше — release с force=true покроет.
+        // release с force=true через onError.
       }
-    } finally {
-      client.release();
+      client.release(true);
       internal[RELEASED_KEY] = true;
+      // Пробрасываем — Fastify перепишет response на 500 через error handler.
+      throw err;
     }
+    client.release();
+    internal[RELEASED_KEY] = true;
+    return payload;
   });
 
   // ROLLBACK + release при ошибке.
