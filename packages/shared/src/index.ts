@@ -3,3 +3,4 @@
 // Контракты — в contracts/*, реэкспортим отсюда чтобы фронт импортил из одной точки.
 
 export * from './contracts/projects.js';
+export * from './contracts/invitations.js';

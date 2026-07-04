@@ -4,7 +4,7 @@ import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type pg from 'pg';
 import * as schema from '../db/schema/index.js';
 import { type Db } from '../db/client.js';
-import { setCompanyContext } from '../db/rls.js';
+import { setCompanyContext, setInvitationTokenContext } from '../db/rls.js';
 import { UnauthorizedError } from '../lib/errors.js';
 
 // request.tx — транзакция домена: держит один pg-client в BEGIN/COMMIT
@@ -139,6 +139,22 @@ export const runWithoutCompanyContext = async <T>(
   fn: (tx: Db) => Promise<T>,
 ): Promise<T> => {
   return db.transaction((tx) => fn(tx as unknown as Db)) as Promise<T>;
+};
+
+// Хелпер для анонимного invitation-флоу (preview/accept). Открывает транзакцию,
+// ставит SET LOCAL app.current_invitation_token_hash, выполняет callback.
+// RLS invitations пропустит только те строки, у которых token_hash совпадает.
+// Внутри callback можно делать SELECT invitations WHERE token_hash = ... AND
+// status = 'pending' AND expires_at > now() — политика уже отсекла всё чужое.
+export const runWithInvitationToken = async <T>(
+  db: Db,
+  tokenHash: string,
+  fn: (tx: Db) => Promise<T>,
+): Promise<T> => {
+  return db.transaction(async (tx) => {
+    await setInvitationTokenContext(tx as unknown as Db, tokenHash);
+    return fn(tx as unknown as Db);
+  }) as Promise<T>;
 };
 
 // Экспорт исходной transactionless Db-обёртки: сам объект NodePgDatabase.

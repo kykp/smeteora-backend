@@ -1,10 +1,12 @@
-import { pgTable, uuid, text, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { companies } from './companies.js';
 import { users } from './users.js';
 import { INVITATION_STATUSES, ROLES } from '../constants.js';
 
-// Приглашение сотрудника в компанию. token — signed, TTL проверяется на бэке.
+// Приглашение сотрудника в компанию. token хранится как SHA-256 hex — токен
+// высокоэнтропийный (32 crypto-байта), argon2 не нужен, sha256 достаточно.
+// Плоский токен показывается ровно один раз при создании — как у API-ключей.
 export const invitations = pgTable(
   'invitations',
   {
@@ -30,6 +32,14 @@ export const invitations = pgTable(
     index('invitations_company_idx').on(t.companyId),
     index('invitations_email_pending_idx')
       .on(t.email)
+      .where(sql`${t.status} = 'pending'`),
+    // Быстрый lookup по token_hash в accept-флоу + защита от повторов активного токена.
+    uniqueIndex('invitations_token_hash_pending_idx')
+      .on(t.tokenHash)
+      .where(sql`${t.status} = 'pending'`),
+    // Нельзя иметь два pending приглашения на один и тот же email в одну и ту же компанию.
+    uniqueIndex('invitations_company_email_pending_idx')
+      .on(t.companyId, t.email)
       .where(sql`${t.status} = 'pending'`),
   ],
 );

@@ -10,3 +10,10 @@ export const setCompanyContext = (tx: Db, companyId: string): Promise<unknown> =
 
 // Альтернатива, которую можно использовать в raw SQL-запросах вместо параметризации.
 export const currentCompanyIdSql: SQL = sql`current_setting('app.current_company_id', true)::uuid`;
+
+// Контекст доступа к invitations по token_hash (анонимный флоу preview/accept).
+// RLS-политики invitations_select_by_token и invitations_update_by_token пропускают
+// строки где token_hash совпадает с этим значением. INSERT/DELETE через token
+// не разрешены — только SELECT и UPDATE (status='accepted').
+export const setInvitationTokenContext = (tx: Db, tokenHash: string): Promise<unknown> =>
+  tx.execute(sql`SELECT set_config('app.current_invitation_token_hash', ${tokenHash}, true)`);
