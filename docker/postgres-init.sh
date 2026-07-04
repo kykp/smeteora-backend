@@ -35,6 +35,12 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
   GRANT CONNECT ON DATABASE $POSTGRES_DB TO smeteora_app;
   GRANT CONNECT ON DATABASE $POSTGRES_DB TO smeteora_migrator;
   GRANT CONNECT ON DATABASE $POSTGRES_DB TO smeteora_platform_editor;
+
+  -- Мигратор создаёт таблицы, схемы (drizzle-мета) и меняет DDL под свои руки.
+  -- Простой CREATEDB на роли позволяет только создавать НОВЫЕ базы; для CREATE SCHEMA
+  -- в существующей нужно либо GRANT CREATE ON DATABASE, либо владение. Ownership
+  -- проще: даёт полный DDL, включая расширения и триггеры без отдельных GRANT'ов.
+  ALTER DATABASE $POSTGRES_DB OWNER TO smeteora_migrator;
 EOSQL
 
 echo "Роли Smeteora созданы успешно."
