@@ -1,0 +1,55 @@
+# Prod-конфигурация для VPS.
+#
+# Три сервиса:
+#   postgres — БД, наружу НЕ выставлена (только внутри compose network).
+#   backend  — Node-процесс, выставлен на 127.0.0.1:3000 (nginx на хосте проксирует).
+#   migrator — one-shot: применяет миграции и завершается.
+#              Запускается вручную (docker compose run --rm migrator) или из GHA деплой-джобы.
+#              Через profile "migrate" сервис НЕ поднимается при обычном `compose up`.
+#
+# .env файлы:
+#   .env          — параметры бэка: DATABASE_URL, SESSION_SECRET, CORS_ORIGIN, COOKIE_DOMAIN...
+#   .env.postgres — POSTGRES_USER/PASSWORD/DB + пароли трёх ролей приложения.
+# Оба файла лежат в /opt/smeteora-api/ на сервере с правами 600 owner smeteora.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env.postgres
+    # Наружу порт НЕ пробрасываем — доступ только из backend/migrator по compose network.
+    volumes:
+      - /opt/smeteora-api/pg_data:/var/lib/postgresql/data
+      - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/10-init-roles.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+
+  backend:
+    # tag :latest перезаписывается GHA workflow'ом при каждом деплое.
+    # Для отката руками: docker compose pull && docker tag ghcr.io/...:sha-<older> ...:latest.
+    image: ghcr.io/kykp/smeteora-backend:latest
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      # Только loopback: nginx на хосте проксирует api.smeteora.ru → 127.0.0.1:3000.
+      - '127.0.0.1:3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  migrator:
+    # Тот же образ, но команда прогоняет миграции.
+    # Запуск: docker compose --profile migrate run --rm migrator
+    image: ghcr.io/kykp/smeteora-backend:latest
+    profiles: ['migrate']
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Мигратор ходит в БД под своей ролью (BYPASSRLS). DATABASE_URL_MIGRATOR
+    # заведён в .env отдельным ключом.
+    command: ['node', 'dist/src/db/migrate.js']

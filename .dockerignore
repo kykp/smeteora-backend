@@ -1,0 +1,33 @@
+# Не тащим в build context ничего лишнего — быстрее сборка, меньше кэша.
+
+# Артефакты и модули
+node_modules
+dist
+coverage
+*.log
+
+# Локальные секреты и env
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Тесты — в prod образ не нужны
+test
+**/*.test.ts
+**/*.spec.ts
+vitest.config.ts
+
+# Инструменты разработки
+.git
+.github
+.husky
+.vscode
+.idea
+docker-compose.yml
+docker-compose.prod.yml
+docs
+
+# Docker
+Dockerfile
+.dockerignore

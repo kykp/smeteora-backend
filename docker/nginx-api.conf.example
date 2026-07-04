@@ -1,0 +1,60 @@
+# Reference-конфиг для nginx на хосте.
+# Пример пути на сервере: /etc/nginx/sites-available/api.smeteora.ru
+# Активация: ln -s /etc/nginx/sites-available/api.smeteora.ru /etc/nginx/sites-enabled/
+#
+# HTTPS-сертификат выпустить: sudo certbot --nginx -d api.smeteora.ru
+# certbot автоматически впишет строки ssl_certificate / ssl_certificate_key
+# и настроит редирект с http на https.
+
+server {
+    listen 80;
+    server_name api.smeteora.ru;
+
+    # После certbot этот блок либо заменится редиректом на https,
+    # либо будет обслуживать ACME challenge.
+    location / {
+        return 404;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name api.smeteora.ru;
+
+    # ssl_certificate / ssl_certificate_key — прописывает certbot.
+
+    # Логи отдельные для API, чтобы не смешивать с фронтом.
+    access_log /var/log/nginx/api.smeteora.ru.access.log;
+    error_log  /var/log/nginx/api.smeteora.ru.error.log;
+
+    # Security headers дублируются в самом Fastify через @fastify/helmet,
+    # но nginx добавляет вторую линию для случаев когда бэк не отвечает.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Body limit — для будущих upload'ов прайс-листов.
+    # Пока держим скромно; поднимем когда появится ingestion.
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+
+        # Пробрасываем реальный IP и протокол для request.log Fastify
+        # (trustProxy=true в prod уже включён).
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Таймауты. Fastify обычно отвечает быстро; чуть больше запаса на будущие тяжёлые операции.
+        proxy_connect_timeout 5s;
+        proxy_send_timeout    30s;
+        proxy_read_timeout    30s;
+
+        # Отключаем буферизацию тела ответа — важно для будущих SSE/long-polling
+        # эндпоинтов. Не критично сейчас, но не мешает.
+        proxy_buffering off;
+    }
+}
