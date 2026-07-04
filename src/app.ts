@@ -14,6 +14,7 @@ import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './modules/auth/routes.js';
 import { projectsRoutes } from './modules/projects/routes.js';
 import { invitationsRoutes } from './modules/invitations/routes.js';
+import { estimatesRoutes } from './modules/estimates/routes.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -113,6 +114,7 @@ export const buildApp = async (config: Config): Promise<FastifyInstance> => {
       await v1.register(authRoutes, { prefix: '/auth' });
       await v1.register(projectsRoutes, { prefix: '/projects' });
       await v1.register(invitationsRoutes, { prefix: '/invitations' });
+      await v1.register(estimatesRoutes, { prefix: '/estimates' });
     },
     { prefix: API_V1_PREFIX },
   );

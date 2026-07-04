@@ -2,6 +2,7 @@ import { type FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { requireRole } from '../../plugins/require-role.js';
 import { UnauthorizedError } from '../../lib/errors.js';
 import { type Db } from '../../db/client.js';
+import { type AuthContext } from '../../plugins/auth.js';
 import * as service from './service.js';
 import {
   createProjectBodySchema,
@@ -20,7 +21,7 @@ import {
 //                          (кладёт транзакцию в request.tx)
 // Внутри хендлеров работаем ТОЛЬКО через request.tx, никаких походов в app.db.
 export const projectsRoutes: FastifyPluginAsyncZod = async (app) => {
-  const assertCtx = (ctx: { companyId: string } | undefined): { companyId: string } => {
+  const assertCtx = (ctx: AuthContext | undefined): AuthContext => {
     if (!ctx) throw new UnauthorizedError();
     return ctx;
   };

@@ -29,6 +29,13 @@
       "when": 1783154932794,
       "tag": "0003_outgoing_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783168332775,
+      "tag": "0004_new_marvel_zombies",
+      "breakpoints": true
     }
   ]
 }

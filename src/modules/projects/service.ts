@@ -2,6 +2,7 @@ import { type Db } from '../../db/client.js';
 import { type Project } from '../../db/schema/index.js';
 import { NotFoundError } from '../../lib/errors.js';
 import { type ProjectStatus } from '../../db/constants.js';
+import { writeAudit } from '../../lib/audit.js';
 import * as repo from './repo.js';
 import {
   type CreateProjectBody,
@@ -120,7 +121,20 @@ export const update = async (
   return toDto(row);
 };
 
-export const softDelete = async (tx: Db, ctx: { companyId: string }, id: string): Promise<void> => {
+// Пишет audit-запись в той же транзакции — если softDelete упадёт, audit тоже откатится.
+export const softDelete = async (
+  tx: Db,
+  ctx: { companyId: string; userId: string; sessionId: string },
+  id: string,
+): Promise<void> => {
   const ok = await repo.softDelete(tx, { id, companyId: ctx.companyId });
   if (!ok) throw new NotFoundError('Проект не найден');
+  await writeAudit(tx, {
+    companyId: ctx.companyId,
+    userId: ctx.userId,
+    sessionId: ctx.sessionId,
+    action: 'project.delete',
+    entityType: 'project',
+    entityId: id,
+  });
 };

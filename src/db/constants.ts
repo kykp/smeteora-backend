@@ -12,6 +12,20 @@ export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 export const PROJECT_STATUSES = ['draft', 'active', 'archived'] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
+export const ESTIMATE_STATUSES = ['draft', 'sent', 'approved', 'rejected', 'archived'] as const;
+export type EstimateStatus = (typeof ESTIMATE_STATUSES)[number];
+
+// Как трактовать цены позиций относительно НДС:
+//   none     — без НДС (subtotal = qty*price)
+//   included — цена уже с НДС внутри (нужно выделить обратной формулой)
+//   added    — НДС начисляется сверху
+export const VAT_MODES = ['none', 'included', 'added'] as const;
+export type VatMode = (typeof VAT_MODES)[number];
+
+// Тип позиции сметы. Разбивка "работы / материалы" — стандарт отчётности по сметам.
+export const LINE_ITEM_KINDS = ['work', 'material', 'service', 'other'] as const;
+export type LineItemKind = (typeof LINE_ITEM_KINDS)[number];
+
 // Иерархия ролей: чем выше индекс — тем больше прав.
 // Используется для проверки "role >= required" в requireRole preHandler.
 export const ROLE_RANK: Readonly<Record<Role, number>> = Object.freeze({
