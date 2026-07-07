@@ -13,6 +13,7 @@ import {
   registerBodySchema,
   switchCompanyBodySchema,
 } from './schema.js';
+import { yandexAuthRoutes } from './yandex-routes.js';
 
 // Жёсткий rate limit на auth-роуты — защита от brute-force.
 // В test-env выключается — интеграционные тесты за секунды делают десятки регистраций.
@@ -143,4 +144,8 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
       });
     },
   );
+
+  // Yandex OAuth — под тем же /auth-префиксом что и остальные auth-роуты.
+  // Отделён от email+password флоу, чтобы структура файлов не разрослась.
+  await app.register(yandexAuthRoutes);
 };

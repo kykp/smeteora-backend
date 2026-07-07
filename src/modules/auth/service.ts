@@ -103,6 +103,10 @@ export const login = async (
     const user = await repo.findUserByEmail(tx, params.email);
     if (!user) throw new UnauthorizedError('Неверный email или пароль');
 
+    // OAuth-only юзер (password_hash IS NULL) — паролем зайти не может.
+    // Сообщение общее, чтобы не подсказывать «этот email есть, но зайдите через Яндекс».
+    if (user.passwordHash === null) throw new UnauthorizedError('Неверный email или пароль');
+
     const ok = await verifyPassword(user.passwordHash, params.password);
     if (!ok) throw new UnauthorizedError('Неверный email или пароль');
 

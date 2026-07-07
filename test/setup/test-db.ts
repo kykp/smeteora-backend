@@ -55,6 +55,7 @@ export const truncateAll = async (): Promise<void> => {
       api_keys,
       sessions,
       invitations,
+      identities,
       estimate_versions,
       estimate_line_items,
       estimate_sections,

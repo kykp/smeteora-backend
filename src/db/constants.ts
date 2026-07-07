@@ -26,6 +26,10 @@ export type VatMode = (typeof VAT_MODES)[number];
 export const LINE_ITEM_KINDS = ['work', 'material', 'service', 'other'] as const;
 export type LineItemKind = (typeof LINE_ITEM_KINDS)[number];
 
+// OAuth-провайдеры, привязка к учётке. Наращивается по мере поддержки.
+export const IDENTITY_PROVIDERS = ['yandex'] as const;
+export type IdentityProvider = (typeof IDENTITY_PROVIDERS)[number];
+
 // Иерархия ролей: чем выше индекс — тем больше прав.
 // Используется для проверки "role >= required" в requireRole preHandler.
 export const ROLE_RANK: Readonly<Record<Role, number>> = Object.freeze({

@@ -10,7 +10,9 @@ export const users = pgTable(
       .primaryKey()
       .default(sql`gen_random_uuid()`),
     email: text('email').notNull(),
-    passwordHash: text('password_hash').notNull(),
+    // Nullable: юзер зашедший только через OAuth не имеет пароля.
+    // При регистрации email+password — обязателен.
+    passwordHash: text('password_hash'),
     name: text('name'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

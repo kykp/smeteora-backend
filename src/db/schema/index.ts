@@ -5,6 +5,7 @@ export * from './companies.js';
 export * from './users.js';
 export * from './memberships.js';
 export * from './sessions.js';
+export * from './identities.js';
 export * from './invitations.js';
 export * from './api-keys.js';
 export * from './audit-log.js';

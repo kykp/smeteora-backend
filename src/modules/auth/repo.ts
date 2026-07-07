@@ -34,7 +34,7 @@ export const findUserById = async (db: Db, userId: string): Promise<User | undef
 
 export const insertUser = async (
   db: Db,
-  params: { email: string; passwordHash: string; name: string | null },
+  params: { email: string; passwordHash: string | null; name: string | null },
 ): Promise<User> => {
   const [row] = await db.insert(users).values(params).returning();
   if (!row) throw new Error('users insert вернул пусто');

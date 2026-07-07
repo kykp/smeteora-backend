@@ -10,11 +10,19 @@ import dbPlugin from './plugins/db.js';
 import securityPlugin from './plugins/security.js';
 import authPlugin from './plugins/auth.js';
 import withCompanyContextPlugin from './plugins/with-company-context.js';
+import yandexOAuthPlugin, { buildYandexClientFromConfig } from './plugins/yandex-oauth.js';
+import { type YandexOAuthClient } from './modules/auth/yandex-client.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './modules/auth/routes.js';
 import { projectsRoutes } from './modules/projects/routes.js';
 import { invitationsRoutes } from './modules/invitations/routes.js';
 import { estimatesRoutes } from './modules/estimates/routes.js';
+
+// Опциональные оверрайды для тестов — подменить внешние клиенты (Яндекс и т.п.)
+// на стабы, чтобы интеграционные тесты не ходили в реальный OAuth-провайдер.
+export type BuildAppOverrides = {
+  yandexOAuth?: YandexOAuthClient | null;
+};
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -35,7 +43,10 @@ const REDACT_PATHS = [
 
 const API_V1_PREFIX = '/api/v1';
 
-export const buildApp = async (config: Config): Promise<FastifyInstance> => {
+export const buildApp = async (
+  config: Config,
+  overrides: BuildAppOverrides = {},
+): Promise<FastifyInstance> => {
   const isDev = config.NODE_ENV === 'development';
 
   const app = Fastify({
@@ -104,6 +115,14 @@ export const buildApp = async (config: Config): Promise<FastifyInstance> => {
   await app.register(dbPlugin);
   await app.register(authPlugin);
   await app.register(withCompanyContextPlugin);
+
+  // Yandex OAuth клиент — реальный в проде (собирается из env), либо
+  // подменённый стаб в тестах. Если ни то ни другое — null (эндпоинты 503).
+  const yandexClient =
+    overrides.yandexOAuth !== undefined
+      ? overrides.yandexOAuth
+      : buildYandexClientFromConfig(config);
+  await app.register(yandexOAuthPlugin, { client: yandexClient });
 
   // Системный роут — вне /api/v1/ префикса.
   await app.register(healthRoutes);
