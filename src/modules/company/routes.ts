@@ -113,6 +113,10 @@ export const companyRoutes: FastifyPluginAsyncZod = async (app) => {
       const { data, contentType } = await logoService.readLogo(tx, app.storage, ctx.companyId);
       void reply.header('Content-Type', contentType);
       void reply.header('Cache-Control', 'private, no-cache');
+      // CORP по умолчанию same-site (из helmet) режет <img crossOrigin=use-credentials>
+      // между smeteora.ru и api.smeteora.ru (и localhost:5173 → localhost:3000).
+      // Логотип — не секретный контент, разрешаем embed с любого origin.
+      void reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
       return reply.send(data);
     },
   );
