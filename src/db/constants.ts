@@ -30,6 +30,11 @@ export type LineItemKind = (typeof LINE_ITEM_KINDS)[number];
 export const IDENTITY_PROVIDERS = ['yandex'] as const;
 export type IdentityProvider = (typeof IDENTITY_PROVIDERS)[number];
 
+// Организационно-правовые формы компаний. БД принимает свободный text,
+// enum используется только на слое приложения (Zod).
+export const LEGAL_FORMS = ['ooo', 'ip', 'self-employed', 'ao'] as const;
+export type LegalForm = (typeof LEGAL_FORMS)[number];
+
 // Иерархия ролей: чем выше индекс — тем больше прав.
 // Используется для проверки "role >= required" в requireRole preHandler.
 export const ROLE_RANK: Readonly<Record<Role, number>> = Object.freeze({

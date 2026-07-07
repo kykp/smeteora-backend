@@ -43,6 +43,13 @@
       "when": 1783300000000,
       "tag": "0005_yandex_identities",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783404000000,
+      "tag": "0006_company_profile",
+      "breakpoints": true
     }
   ]
 }

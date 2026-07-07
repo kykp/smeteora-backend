@@ -17,6 +17,7 @@ import { authRoutes } from './modules/auth/routes.js';
 import { projectsRoutes } from './modules/projects/routes.js';
 import { invitationsRoutes } from './modules/invitations/routes.js';
 import { estimatesRoutes } from './modules/estimates/routes.js';
+import { companyRoutes } from './modules/company/routes.js';
 
 // Опциональные оверрайды для тестов — подменить внешние клиенты (Яндекс и т.п.)
 // на стабы, чтобы интеграционные тесты не ходили в реальный OAuth-провайдер.
@@ -134,6 +135,7 @@ export const buildApp = async (
       await v1.register(projectsRoutes, { prefix: '/projects' });
       await v1.register(invitationsRoutes, { prefix: '/invitations' });
       await v1.register(estimatesRoutes, { prefix: '/estimates' });
+      await v1.register(companyRoutes, { prefix: '/company' });
     },
     { prefix: API_V1_PREFIX },
   );
