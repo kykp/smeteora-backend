@@ -33,7 +33,6 @@ const asMeta = (v: unknown): Record<string, unknown> =>
 
 const estimateToHeader = (row: Estimate): EstimateHeader => ({
   id: row.id,
-  companyId: row.companyId,
   projectId: row.projectId,
   number: row.number,
   title: row.title,

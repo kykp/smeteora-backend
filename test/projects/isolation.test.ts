@@ -92,10 +92,13 @@ describe('projects — изоляция между компаниями', () => 
       headers: { cookie: a.cookie },
     });
     expect(resA.statusCode).toBe(200);
+    // Изоляция проверяется по количеству и именам — companyId в ответе не отдаётся.
     expect(resA.json().total).toBe(2);
-    expect(resA.json().items.every((p: { companyId: string }) => p.companyId === a.companyId)).toBe(
-      true,
-    );
+    const namesA = resA
+      .json()
+      .items.map((p: { name: string }) => p.name)
+      .sort();
+    expect(namesA).toEqual(['A only 1', 'A only 2']);
 
     const resB = await app.inject({
       method: 'GET',
@@ -104,7 +107,7 @@ describe('projects — изоляция между компаниями', () => 
     });
     expect(resB.statusCode).toBe(200);
     expect(resB.json().total).toBe(1);
-    expect(resB.json().items[0].companyId).toBe(b.companyId);
+    expect(resB.json().items[0].name).toBe('B only');
   });
 
   it('RLS: без SET LOCAL app.current_company_id — под ролью app 0 строк', async () => {

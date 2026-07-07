@@ -16,7 +16,6 @@ import {
 // поле date уже возвращается Drizzle как строка YYYY-MM-DD.
 const toDto = (row: Project): ProjectResponse => ({
   id: row.id,
-  companyId: row.companyId,
   name: row.name,
   description: row.description,
   address: row.address,

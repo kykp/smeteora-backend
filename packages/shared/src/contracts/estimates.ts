@@ -55,9 +55,9 @@ const percentDecimal = (label: string) =>
 
 // ── Шапка ────────────────────────────────────────────────────────
 
+// companyId наружу НЕ отдаём (см. проект.ProjectSchema — та же логика).
 export const estimateHeaderSchema = z.object({
   id: uuidSchema,
-  companyId: uuidSchema,
   projectId: uuidSchema,
   number: z.string().nullable(),
   title: z.string(),

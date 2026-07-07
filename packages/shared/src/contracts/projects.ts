@@ -30,13 +30,13 @@ const isoDateSchema = z
   .nullable();
 
 // ── Доменная сущность ────────────────────────────────────────────
-// Ответы API отдают companyId — фронт использует его для сверки с активной
-// компанией из /me. Но НЕ показывают ссылки на чужие компании (RLS гарантирует
-// что клиент никогда не увидит проекты не своей компании).
+// companyId наружу НЕ отдаём: клиент всегда работает в контексте своей
+// активной компании (см. /me → company.id), поэтому дублировать её на
+// каждом проекте бессмысленно. RLS + auth-гейт гарантируют что клиент
+// физически не увидит проекты чужой компании.
 
 export const projectSchema = z.object({
   id: uuidSchema,
-  companyId: uuidSchema,
   name: z.string().min(PROJECT_NAME_MIN).max(PROJECT_NAME_MAX),
   description: nullableString(PROJECT_DESCRIPTION_MAX),
   address: nullableString(PROJECT_ADDRESS_MAX),

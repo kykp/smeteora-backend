@@ -23,7 +23,7 @@ describe('estimates — CRUD (happy path)', () => {
   });
 
   it('POST /estimates — создаёт смету, дефолты: status=draft, currency=RUB, vatMode=none', async () => {
-    const { cookie, companyId } = await registerOwner(app, {
+    const { cookie } = await registerOwner(app, {
       email: 'own@a.com',
       companyName: 'AA',
     });
@@ -39,7 +39,8 @@ describe('estimates — CRUD (happy path)', () => {
     expect(res.statusCode).toBe(201);
     const body = res.json();
     expect(body.estimate.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(body.estimate.companyId).toBe(companyId);
+    // companyId наружу не отдаём — клиент работает в контексте своей активной компании.
+    expect(body.estimate).not.toHaveProperty('companyId');
     expect(body.estimate.projectId).toBe(project.id);
     expect(body.estimate.title).toBe('ЖК Ромашка, черновая');
     expect(body.estimate.status).toBe('draft');

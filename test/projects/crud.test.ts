@@ -22,7 +22,7 @@ describe('projects — CRUD (happy path)', () => {
   });
 
   it('POST /projects — создаёт проект (201) с дефолтным status=draft', async () => {
-    const { cookie, companyId } = await registerOwner(app, {
+    const { cookie } = await registerOwner(app, {
       email: 'owner@a.com',
       companyName: 'Компания А',
     });
@@ -42,7 +42,8 @@ describe('projects — CRUD (happy path)', () => {
     expect(res.statusCode).toBe(201);
     const body = res.json();
     expect(body.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(body.companyId).toBe(companyId);
+    // companyId наружу не отдаём — клиент работает в контексте активной компании из /me.
+    expect(body).not.toHaveProperty('companyId');
     expect(body.name).toBe('ЖК Ромашка, корпус 3');
     expect(body.status).toBe('draft');
     expect(body.description).toBeNull();

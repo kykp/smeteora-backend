@@ -107,8 +107,9 @@ describe('estimates — изоляция между компаниями', () =>
       url: '/api/v1/estimates',
       headers: { cookie: a.cookie },
     });
+    // Изоляция проверяется по количеству — companyId в ответе не отдаётся.
     expect(resA.json().total).toBe(2);
-    expect(resA.json().items.every((e: { companyId: string }) => e.companyId === a.companyId)).toBe(
+    expect(resA.json().items.every((e: { projectId: string }) => e.projectId === aProject.id)).toBe(
       true,
     );
   });
