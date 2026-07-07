@@ -6,6 +6,8 @@ import * as repo from './repo.js';
 import {
   type CreateCategoryBody,
   type CreateProductBody,
+  type ListBrandsQuery,
+  type ListBrandsResponse,
   type ListProductsQuery,
   type ListProductsResponse,
   type ProductCategoryDto,
@@ -144,6 +146,20 @@ export const softDeleteCategory = async (
   });
 };
 
+// ── Brands ─────────────────────────────────────────────────────────
+
+export const listBrands = async (
+  tx: Db,
+  ctx: { companyId: string },
+  query: ListBrandsQuery,
+): Promise<ListBrandsResponse> => {
+  const items = await repo.listBrands(tx, {
+    companyId: ctx.companyId,
+    scope: query.scope,
+  });
+  return { items };
+};
+
 // ── Products ──────────────────────────────────────────────────────
 
 export const listProducts = async (
@@ -153,9 +169,9 @@ export const listProducts = async (
 ): Promise<ListProductsResponse> => {
   const { items, total } = await repo.listProducts(tx, {
     companyId: ctx.companyId,
-    categoryId: query.categoryId,
+    categoryIds: query.categoryId,
     q: query.q,
-    brand: query.brand,
+    brands: query.brand,
     scope: query.scope,
     isActive: query.isActive,
     limit: query.limit,

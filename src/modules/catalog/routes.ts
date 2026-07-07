@@ -8,6 +8,8 @@ import {
   createCategoryBodySchema,
   createProductBodySchema,
   idParamSchema,
+  listBrandsQuerySchema,
+  listBrandsResponseSchema,
   listCategoriesResponseSchema,
   listProductsQuerySchema,
   listProductsResponseSchema,
@@ -129,6 +131,27 @@ export const productsRoutes: FastifyPluginAsyncZod = async (app) => {
       const ctx = assertCtx(request.ctx);
       const tx = assertTx(request.tx);
       return service.listProducts(tx, ctx, request.query);
+    },
+  );
+
+  // ── GET /products/brands ──
+  // Стабильный список всех брендов в scope, с counts. Порядок count DESC / brand ASC.
+  // Отдельный endpoint потому что список товаров возвращает страницу, а фильтру
+  // нужен полный словарь. Иначе бренды прыгают при смене страницы.
+  app.get(
+    '/brands',
+    {
+      schema: {
+        querystring: listBrandsQuerySchema,
+        response: { 200: listBrandsResponseSchema },
+        tags: ['catalog'],
+      },
+      onRequest: [app.authenticate, requireRole('viewer'), app.withCompanyContext],
+    },
+    async (request) => {
+      const ctx = assertCtx(request.ctx);
+      const tx = assertTx(request.tx);
+      return service.listBrands(tx, ctx, request.query);
     },
   );
 

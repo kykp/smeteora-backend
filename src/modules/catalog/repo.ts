@@ -1,4 +1,17 @@
-import { and, asc, count, eq, isNull, or, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { type Db } from '../../db/client.js';
 import {
   products,
@@ -131,9 +144,9 @@ export const softDeleteCategory = async (
 
 type ListProductsParams = {
   companyId: string;
-  categoryId?: string | undefined;
+  categoryIds?: string[] | undefined;
   q?: string | undefined;
-  brand?: string | undefined;
+  brands?: string[] | undefined;
   scope: 'all' | 'own' | 'platform';
   isActive?: boolean | undefined;
   limit: number;
@@ -159,11 +172,11 @@ const buildProductConditions = (params: ListProductsParams): SQL[] => {
     );
   }
 
-  if (params.categoryId !== undefined) {
-    conditions.push(eq(products.categoryId, params.categoryId));
+  if (params.categoryIds && params.categoryIds.length > 0) {
+    conditions.push(inArray(products.categoryId, params.categoryIds));
   }
-  if (params.brand !== undefined) {
-    conditions.push(eq(products.brand, params.brand));
+  if (params.brands && params.brands.length > 0) {
+    conditions.push(inArray(products.brand, params.brands));
   }
   if (params.isActive !== undefined) {
     conditions.push(eq(products.isActive, params.isActive));
@@ -194,6 +207,35 @@ export const listProducts = async (
     .where(and(...conditions));
 
   return { items, total: countRow?.value ?? 0 };
+};
+
+// Стабильный список брендов в scope компании — независимо от текущей страницы.
+// Отсекаем NULL и пустые. Сортируем по count DESC, alphabet ASC — юзеру
+// сверху самые «наполненные» бренды, разрывы по алфавиту.
+export const listBrands = async (
+  tx: Db,
+  params: { companyId: string; scope: 'all' | 'own' | 'platform' },
+): Promise<Array<{ brand: string; count: number }>> => {
+  const scopeCond =
+    params.scope === 'own'
+      ? eq(products.companyId, params.companyId)
+      : params.scope === 'platform'
+        ? isNull(products.companyId)
+        : (or(eq(products.companyId, params.companyId), isNull(products.companyId)) ?? sql`false`);
+
+  const rows = await tx
+    .select({
+      brand: products.brand,
+      count: count(),
+    })
+    .from(products)
+    .where(
+      and(isNull(products.deletedAt), isNotNull(products.brand), ne(products.brand, ''), scopeCond),
+    )
+    .groupBy(products.brand)
+    .orderBy(desc(count()), asc(products.brand));
+
+  return rows.map((r) => ({ brand: r.brand ?? '', count: r.count }));
 };
 
 export const findProductById = async (

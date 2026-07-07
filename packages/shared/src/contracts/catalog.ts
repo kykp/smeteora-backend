@@ -112,10 +112,24 @@ export const productSchema = z.object({
 });
 export type ProductDto = z.infer<typeof productSchema>;
 
+// Мульти-параметры (categoryId, brand) принимают HTTP-repeat: ?brand=A&brand=B.
+// Fastify отдаёт одиночный ?brand=A как строку, повторы — как массив, поэтому
+// делаем union и нормализуем в array. Пустые значения выкидываем.
+const multiStringField = (max: number) =>
+  z
+    .union([z.string().trim().min(1).max(max), z.array(z.string().trim().min(1).max(max))])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional();
+
+const multiUuidField = z
+  .union([uuidSchema, z.array(uuidSchema)])
+  .transform((v) => (Array.isArray(v) ? v : [v]))
+  .optional();
+
 export const listProductsQuerySchema = z.object({
-  categoryId: uuidSchema.optional(),
+  categoryId: multiUuidField,
   q: z.string().trim().min(1).max(200).optional(),
-  brand: z.string().trim().min(1).max(PRODUCT_BRAND_MAX).optional(),
+  brand: multiStringField(PRODUCT_BRAND_MAX),
   // scope: 'all' — свои + платформа (default), 'own' — только свои, 'platform' — только платформа
   scope: z.enum(['all', 'own', 'platform']).default('all'),
   isActive: z.coerce.boolean().optional(),
@@ -128,6 +142,24 @@ export const listProductsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 export type ListProductsQuery = z.infer<typeof listProductsQuerySchema>;
+
+// Отдельный endpoint для стабильного списка брендов независимо от пагинации.
+// Сортировка по бэку: count DESC, brand ASC. Пустые/null бренды не попадают.
+export const listBrandsQuerySchema = z.object({
+  scope: z.enum(['all', 'own', 'platform']).default('own'),
+});
+export type ListBrandsQuery = z.infer<typeof listBrandsQuerySchema>;
+
+export const brandItemSchema = z.object({
+  brand: z.string(),
+  count: z.number().int().min(1),
+});
+export type BrandItemDto = z.infer<typeof brandItemSchema>;
+
+export const listBrandsResponseSchema = z.object({
+  items: z.array(brandItemSchema),
+});
+export type ListBrandsResponse = z.infer<typeof listBrandsResponseSchema>;
 
 export const listProductsResponseSchema = z.object({
   items: z.array(productSchema),
