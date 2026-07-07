@@ -47,6 +47,11 @@ export const closeTestDb = async (): Promise<void> => {
 
 // Очистка доменных таблиц. Вызывается в beforeEach из под migrator-роли —
 // иначе RLS/permission не пропустят TRUNCATE.
+//
+// После TRUNCATE companies CASCADE Postgres автоматически чистит все таблицы
+// с FK на companies — включая product_categories и products, даже строки
+// с company_id IS NULL. Поэтому re-seed платформенных категорий делаем
+// в конце. Единицы (units) не имеют FK на companies — не чистятся.
 export const truncateAll = async (): Promise<void> => {
   const { pool } = getSetupDb();
   await pool.query(`
@@ -65,5 +70,18 @@ export const truncateAll = async (): Promise<void> => {
       users,
       companies
     RESTART IDENTITY CASCADE;
+  `);
+  // Re-seed платформенных категорий — идентично миграции 0009. Каждый тест
+  // получает свежую платформу с теми же кодами.
+  await pool.query(`
+    INSERT INTO product_categories (company_id, source, code, name, sort_order) VALUES
+      (NULL, 'platform', 'video',    'Видеонаблюдение',        10),
+      (NULL, 'platform', 'audio',    'Аудио и переговорные',   20),
+      (NULL, 'platform', 'security', 'Охрана (СКУД, датчики)', 30),
+      (NULL, 'platform', 'network',  'Сетевое оборудование',   40),
+      (NULL, 'platform', 'cable',    'Кабели',                 50),
+      (NULL, 'platform', 'power',    'Питание',                60),
+      (NULL, 'platform', 'mount',    'Крепёж и монтаж',        70),
+      (NULL, 'platform', 'other',    'Прочее',                 90);
   `);
 };

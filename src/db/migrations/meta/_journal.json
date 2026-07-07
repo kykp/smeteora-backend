@@ -64,6 +64,13 @@
       "when": 1783424597549,
       "tag": "0008_faithful_thunderbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783429755284,
+      "tag": "0009_eager_spacker_dave",
+      "breakpoints": true
     }
   ]
 }

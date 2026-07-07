@@ -11,3 +11,6 @@ export * from './api-keys.js';
 export * from './audit-log.js';
 export * from './projects.js';
 export * from './estimates.js';
+export * from './units.js';
+export * from './product-categories.js';
+export * from './products.js';

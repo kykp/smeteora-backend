@@ -35,6 +35,15 @@ export type IdentityProvider = (typeof IDENTITY_PROVIDERS)[number];
 export const LEGAL_FORMS = ['ooo', 'ip', 'self-employed', 'ao'] as const;
 export type LegalForm = (typeof LEGAL_FORMS)[number];
 
+// Каталог: источник записи (платформенная = наша, company = юзерская).
+// Влияет на видимость через RLS-политику и на права редактирования.
+export const CATALOG_SOURCES = ['platform', 'company'] as const;
+export type CatalogSource = (typeof CATALOG_SOURCES)[number];
+
+// Источник записи офера / прайс-листа. Пригодится когда подключим импорт из CSV/XLSX/PDF/API.
+export const CATALOG_OFFER_SOURCES = ['manual', 'csv', 'xlsx', 'pdf', 'api'] as const;
+export type CatalogOfferSource = (typeof CATALOG_OFFER_SOURCES)[number];
+
 // Иерархия ролей: чем выше индекс — тем больше прав.
 // Используется для проверки "role >= required" в requireRole preHandler.
 export const ROLE_RANK: Readonly<Record<Role, number>> = Object.freeze({
