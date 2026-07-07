@@ -44,6 +44,12 @@ export const companyResponseSchema = z.object({
   phone: z.string().nullable(),
   email: z.string().nullable(),
   hasLogo: z.boolean(),
+  // Что показывать в PDF смет. Дефолт всё true — можно отключить блоки чтобы
+  // не светить банковские реквизиты или контакты клиенту.
+  pdfShowLogo: z.boolean(),
+  pdfShowAddresses: z.boolean(),
+  pdfShowBank: z.boolean(),
+  pdfShowDirector: z.boolean(),
 });
 export type CompanyResponse = z.infer<typeof companyResponseSchema>;
 
@@ -86,6 +92,12 @@ export const patchCompanyBodySchema = z
     bik: bikSchema.nullish(),
     checkingAccount: accountSchema.nullish(),
     correspondentAccount: accountSchema.nullish(),
+    // PDF-флаги: чистый boolean, null не разрешён (сброс в дефолт не нужен —
+    // это булев тумблер, а не строковое поле).
+    pdfShowLogo: z.boolean().optional(),
+    pdfShowAddresses: z.boolean().optional(),
+    pdfShowBank: z.boolean().optional(),
+    pdfShowDirector: z.boolean().optional(),
     directorName: nonEmptyTrimmed(DIRECTOR_NAME_MAX).nullish(),
     directorPosition: nonEmptyTrimmed(DIRECTOR_POSITION_MAX).nullish(),
     phone: nonEmptyTrimmed(PHONE_MAX).nullish(),

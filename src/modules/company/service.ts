@@ -29,6 +29,10 @@ const toResponse = (row: Company): CompanyResponse => ({
   phone: row.phone,
   email: row.email,
   hasLogo: row.logoKey !== null,
+  pdfShowLogo: row.pdfShowLogo,
+  pdfShowAddresses: row.pdfShowAddresses,
+  pdfShowBank: row.pdfShowBank,
+  pdfShowDirector: row.pdfShowDirector,
 });
 
 export const get = async (tx: Db, companyId: string): Promise<CompanyResponse> => {
@@ -74,6 +78,10 @@ export const update = async (
   assignNullable('directorPosition', body.directorPosition);
   assignNullable('phone', body.phone);
   assignNullable('email', body.email);
+  assignNullable('pdfShowLogo', body.pdfShowLogo);
+  assignNullable('pdfShowAddresses', body.pdfShowAddresses);
+  assignNullable('pdfShowBank', body.pdfShowBank);
+  assignNullable('pdfShowDirector', body.pdfShowDirector);
 
   const row = await repo.patch(tx, companyId, values);
   if (!row) throw new NotFoundError('Компания не найдена');

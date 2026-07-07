@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, index } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // companies — тенант. Реквизиты (inn/kpp/ogrn/…) заполняются постепенно,
@@ -32,6 +32,13 @@ export const companies = pgTable(
     // null = логотип не установлен.
     logoKey: text('logo_key'),
     logoContentType: text('logo_content_type'),
+
+    // Что показывать в PDF смет. По умолчанию всё включено — юзер может отключить
+    // блоки, которые не хочет светить клиенту (банковские реквизиты, контакты и т.п.).
+    pdfShowLogo: boolean('pdf_show_logo').notNull().default(true),
+    pdfShowAddresses: boolean('pdf_show_addresses').notNull().default(true),
+    pdfShowBank: boolean('pdf_show_bank').notNull().default(true),
+    pdfShowDirector: boolean('pdf_show_director').notNull().default(true),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
