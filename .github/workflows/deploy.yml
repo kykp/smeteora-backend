@@ -1,13 +1,16 @@
 name: Deploy to prod
 
-# Триггер — успешный CI на main. Так деплоим только зелёный код.
-# Ручной запуск тоже разрешён (workflow_dispatch) для отката/пере-выкатки.
+# Manual-only деплой.
+# Фикс от 2026-07-07: убрали автотриггер (workflow_run на успешный CI)
+# после brute-force incident на соседнем VPS у провайдера — не хотим,
+# чтобы merge в main сразу катил в prod. CI прогоняем, но выкатываем осознанно.
 on:
-  workflow_run:
-    workflows: ['CI']
-    types: [completed]
-    branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Введите "deploy" для подтверждения'
+        required: true
+        default: ''
 
 # Не даём двум деплоям идти параллельно на один сервер.
 # cancel-in-progress НЕ ставим — прерванный docker pull может оставить кривое состояние.
@@ -21,11 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
-    # Не пускаем деплой если CI упал.
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
-
     permissions:
       contents: read
       packages: write
@@ -34,12 +32,13 @@ jobs:
       image_tag: ${{ steps.meta.outputs.short_sha }}
 
     steps:
+      - name: Guard against accidental trigger
+        if: ${{ github.event.inputs.confirm != 'deploy' }}
+        run: |
+          echo "::error::Введите 'deploy' в поле подтверждения. Вы ввели: '${{ github.event.inputs.confirm }}'"
+          exit 1
+
       - uses: actions/checkout@v4
-        with:
-          # workflow_run триггерится на SHA пуша — но actions/checkout по умолчанию
-          # тянет ту же ветку. Ставим explicit ref, чтобы деплоить конкретный коммит,
-          # а не HEAD ветки на момент запуска джобы.
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Compute short SHA
         id: meta
