@@ -8,10 +8,12 @@ import {
 import * as service from './service.js';
 import {
   authUserResponseSchema,
+  changePasswordBodySchema,
   loginBodySchema,
   okResponseSchema,
   registerBodySchema,
   switchCompanyBodySchema,
+  updateMeBodySchema,
 } from './schema.js';
 import { yandexAuthRoutes } from './yandex-routes.js';
 
@@ -121,6 +123,52 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
         userId: ctx.userId,
         membershipId: ctx.membershipId,
       });
+    },
+  );
+
+  app.patch(
+    '/me',
+    {
+      schema: {
+        body: updateMeBodySchema,
+        response: { 200: authUserResponseSchema },
+        tags: ['auth'],
+      },
+      onRequest: [app.authenticate],
+    },
+    async (request) => {
+      const ctx = request.ctx;
+      if (!ctx) throw new UnauthorizedError();
+      return service.updateMe(app.db, {
+        userId: ctx.userId,
+        membershipId: ctx.membershipId,
+        patch: { name: request.body.name },
+      });
+    },
+  );
+
+  app.post(
+    '/change-password',
+    {
+      schema: {
+        body: changePasswordBodySchema,
+        response: { 200: okResponseSchema },
+        tags: ['auth'],
+      },
+      // Rate-limit жёсткий как у логина — потенциальный вектор перебора текущего пароля.
+      config: authRateLimit,
+      onRequest: [app.authenticate],
+    },
+    async (request) => {
+      const ctx = request.ctx;
+      if (!ctx) throw new UnauthorizedError();
+      await service.changePassword(app.db, {
+        userId: ctx.userId,
+        sessionId: ctx.sessionId,
+        currentPassword: request.body.currentPassword,
+        newPassword: request.body.newPassword,
+      });
+      return { ok: true as const };
     },
   );
 

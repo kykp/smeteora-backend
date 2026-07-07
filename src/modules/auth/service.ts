@@ -153,6 +153,65 @@ export const me = async (
   return runWithoutCompanyContext(db, (tx) => buildAuthResponse(tx, params));
 };
 
+// PATCH /auth/me — обновить свой профиль. Возвращает свежий /me-ответ.
+export const updateMe = async (
+  db: Db,
+  params: {
+    userId: string;
+    membershipId: string;
+    patch: { name?: string | null | undefined };
+  },
+): Promise<AuthUserResponse> => {
+  return runWithoutCompanyContext(db, async (tx) => {
+    if (params.patch.name !== undefined) {
+      await repo.updateUserName(tx, { userId: params.userId, name: params.patch.name });
+    }
+    return buildAuthResponse(tx, {
+      userId: params.userId,
+      membershipId: params.membershipId,
+    });
+  });
+};
+
+// POST /auth/change-password. Требует currentPassword — подтверждаем что
+// это реальный владелец, а не украденная сессия. Остальные сессии этого
+// юзера отзываются: если пароль сменили, значит скомпрометирован — все
+// остальные девайсы отваливаются.
+// OAuth-only юзер (password_hash IS NULL) → 400: у него нет пароля, менять
+// нечего. Установка первого пароля из OAuth-акка — отдельный флоу, пока не
+// реализован.
+export const changePassword = async (
+  db: Db,
+  params: {
+    userId: string;
+    sessionId: string;
+    currentPassword: string;
+    newPassword: string;
+  },
+): Promise<void> => {
+  return runWithoutCompanyContext(db, async (tx) => {
+    const user = await repo.findUserById(tx, params.userId);
+    if (!user) throw new UnauthorizedError();
+    if (user.passwordHash === null) {
+      throw new ConflictError('У аккаунта нет пароля. Вход только через OAuth-провайдер.');
+    }
+    const ok = await verifyPassword(user.passwordHash, params.currentPassword);
+    if (!ok) throw new UnauthorizedError('Неверный текущий пароль');
+
+    if (params.newPassword === params.currentPassword) {
+      throw new ConflictError('Новый пароль совпадает с текущим');
+    }
+
+    const newHash = await hashPassword(params.newPassword);
+    await repo.updateUserPasswordHash(tx, { userId: params.userId, passwordHash: newHash });
+    // Отзываем все остальные сессии — текущая остаётся.
+    await repo.revokeOtherUserSessions(tx, {
+      userId: params.userId,
+      keepSessionId: params.sessionId,
+    });
+  });
+};
+
 export const switchCompany = async (
   db: Db,
   params: { userId: string; sessionId: string; membershipId: string },

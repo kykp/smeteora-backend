@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { type FastifyInstance } from 'fastify';
 import { buildApp, type BuildAppOverrides } from '../../src/app.js';
 import { type Config } from '../../src/config.js';
@@ -24,6 +27,9 @@ export const buildTestApp = async (overrides: BuildAppOverrides = {}): Promise<F
     YANDEX_OAUTH_CLIENT_ID: 'test-client-id',
     YANDEX_OAUTH_CLIENT_SECRET: 'test-client-secret',
     YANDEX_OAUTH_REDIRECT_URI: 'http://localhost:3000/api/v1/auth/yandex/callback',
+    // Уникальная temp-директория на инстанс приложения — тесты не должны
+    // подмешивать логотипы друг другу через общую директорию.
+    UPLOADS_DIR: mkdtempSync(join(tmpdir(), 'smeteora-uploads-')),
   });
 
   return buildApp(config, overrides);

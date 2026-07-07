@@ -41,6 +41,12 @@ const configSchema = z
     // На ошибку — страница с сообщением (например https://smeteora.ru/auth/error).
     FRONTEND_OAUTH_SUCCESS_URL: z.string().url().optional(),
     FRONTEND_OAUTH_ERROR_URL: z.string().url().optional(),
+
+    // ── FileStorage ──
+    // Локальная директория для файлов (логотипы компаний и т.п.).
+    // Относительный путь резолвится от cwd (в контейнере это /app).
+    // На VPS mount'ится через docker volume /opt/smeteora-api/data:/app/data.
+    UPLOADS_DIR: z.string().default('./data/uploads'),
   })
   .superRefine((cfg, ctx) => {
     const yandex = [

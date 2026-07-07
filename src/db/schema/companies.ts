@@ -28,6 +28,11 @@ export const companies = pgTable(
     phone: text('phone'),
     email: text('email'),
 
+    // Логотип. logo_key — путь в FileStorage. logo_content_type — MIME для отдачи.
+    // null = логотип не установлен.
+    logoKey: text('logo_key'),
+    logoContentType: text('logo_content_type'),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),

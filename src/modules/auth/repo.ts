@@ -135,6 +135,43 @@ export const revokeAllUserSessions = async (db: Db, userId: string): Promise<voi
     .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
 };
 
+// Отозвать все сессии юзера КРОМЕ одной (обычно — текущей). Используется
+// после смены пароля: остальные девайсы должны выйти, текущий остаётся.
+export const revokeOtherUserSessions = async (
+  db: Db,
+  params: { userId: string; keepSessionId: string },
+): Promise<void> => {
+  await db
+    .update(sessions)
+    .set({ revokedAt: sql`now()` })
+    .where(
+      and(
+        eq(sessions.userId, params.userId),
+        isNull(sessions.revokedAt),
+        sql`${sessions.id} <> ${params.keepSessionId}`,
+      ),
+    );
+};
+
+// Обновить name у пользователя. name nullable — null очищает.
+export const updateUserName = async (
+  db: Db,
+  params: { userId: string; name: string | null },
+): Promise<void> => {
+  await db.update(users).set({ name: params.name }).where(eq(users.id, params.userId));
+};
+
+// Обновить password_hash у пользователя.
+export const updateUserPasswordHash = async (
+  db: Db,
+  params: { userId: string; passwordHash: string },
+): Promise<void> => {
+  await db
+    .update(users)
+    .set({ passwordHash: params.passwordHash })
+    .where(eq(users.id, params.userId));
+};
+
 export const updateSessionActiveMembership = async (
   db: Db,
   params: { sessionId: string; activeMembershipId: string },

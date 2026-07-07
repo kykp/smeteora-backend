@@ -24,6 +24,8 @@ const nonEmptyTrimmed = (max: number) => z.string().trim().min(1).max(max);
 
 // ── Ответ ────────────────────────────────────────────────────────
 // Все реквизиты nullable — компания заводится с одним name, юзер заполняет постепенно.
+// hasLogo — булев флаг «загружен ли логотип»; сам файл фронт получает
+// отдельным GET /company/logo (returns бинарник + Content-Type).
 export const companyResponseSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
@@ -41,8 +43,29 @@ export const companyResponseSchema = z.object({
   directorPosition: z.string().nullable(),
   phone: z.string().nullable(),
   email: z.string().nullable(),
+  hasLogo: z.boolean(),
 });
 export type CompanyResponse = z.infer<typeof companyResponseSchema>;
+
+// Ответ upload'а логотипа — сокращённый: клиент обычно всё равно обновит /company целиком.
+export const uploadLogoResponseSchema = z.object({
+  ok: z.literal(true),
+  hasLogo: z.literal(true),
+});
+
+// Ответ delete'а — hasLogo=false для симметрии с upload'ом.
+export const deleteLogoResponseSchema = z.object({
+  ok: z.literal(true),
+  hasLogo: z.literal(false),
+});
+
+// Допустимые MIME-типы логотипа. Проверяем на приёме, чтобы кто-то не залил
+// exe под видом image/png. Фронт должен ресайзить/оптимизировать в один из этих
+// форматов перед отправкой.
+export const LOGO_ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp'] as const;
+export type LogoMimeType = (typeof LOGO_ALLOWED_MIME)[number];
+
+export const LOGO_MAX_BYTES = 2 * 1024 * 1024; // 2 МБ
 
 // ── PATCH-body ───────────────────────────────────────────────────
 // Семантика partial update:

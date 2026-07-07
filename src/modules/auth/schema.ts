@@ -45,6 +45,28 @@ export const switchCompanyBodySchema = z.object({
 });
 export type SwitchCompanyBody = z.infer<typeof switchCompanyBodySchema>;
 
+// ── Update self (PATCH /me) ──
+// Пока только name. Email и смена компании — отдельные флоу.
+export const updateMeBodySchema = z
+  .object({
+    // undefined → не трогаем; null → сбрасываем; string → записываем (после trim).
+    name: z.string().trim().min(1).max(USER_NAME_MAX).nullish(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), {
+    message: 'Нужно передать хотя бы одно поле для обновления',
+  });
+export type UpdateMeBody = z.infer<typeof updateMeBodySchema>;
+
+// ── Change password ──
+// currentPassword обязателен: подтверждаем что запрос от реального владельца
+// (а не от подхваченной чужой session). newPassword — те же правила минимальной
+// длины что и при регистрации.
+export const changePasswordBodySchema = z.object({
+  currentPassword: passwordSchema,
+  newPassword: passwordSchema,
+});
+export type ChangePasswordBody = z.infer<typeof changePasswordBodySchema>;
+
 // ── Responses ──
 
 // Общий ответ на успешный auth-flow — что бы клиент не путался в форматах.

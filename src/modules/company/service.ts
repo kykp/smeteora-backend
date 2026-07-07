@@ -28,6 +28,7 @@ const toResponse = (row: Company): CompanyResponse => ({
   directorPosition: row.directorPosition,
   phone: row.phone,
   email: row.email,
+  hasLogo: row.logoKey !== null,
 });
 
 export const get = async (tx: Db, companyId: string): Promise<CompanyResponse> => {

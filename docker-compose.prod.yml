@@ -37,6 +37,10 @@ services:
     ports:
       # Только loopback: nginx на хосте проксирует api.smeteora.ru → 127.0.0.1:3000.
       - '127.0.0.1:3000:3000'
+    volumes:
+      # Файлы (логотипы и пр.) переживают recreate контейнера.
+      # На хосте /opt/smeteora-api/data должна быть с owner uid 1000 (юзер node).
+      - /opt/smeteora-api/data:/app/data
     depends_on:
       postgres:
         condition: service_healthy

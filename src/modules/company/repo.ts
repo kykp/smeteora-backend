@@ -29,3 +29,19 @@ export const patch = async (
     .returning();
   return row;
 };
+
+// Прицельно читаем ключ логотипа + content-type — для GET /logo, чтобы
+// не таскать всю строку с полями реквизитов.
+export const findLogoMeta = async (
+  db: Db,
+  companyId: string,
+): Promise<{ logoKey: string; logoContentType: string | null } | undefined> => {
+  const rows = await db
+    .select({ logoKey: companies.logoKey, logoContentType: companies.logoContentType })
+    .from(companies)
+    .where(and(eq(companies.id, companyId), isNull(companies.deletedAt)))
+    .limit(1);
+  const row = rows[0];
+  if (!row || row.logoKey === null) return undefined;
+  return { logoKey: row.logoKey, logoContentType: row.logoContentType };
+};
