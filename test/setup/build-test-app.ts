@@ -30,6 +30,17 @@ export const buildTestApp = async (overrides: BuildAppOverrides = {}): Promise<F
     // Уникальная temp-директория на инстанс приложения — тесты не должны
     // подмешивать логотипы друг другу через общую директорию.
     UPLOADS_DIR: mkdtempSync(join(tmpdir(), 'smeteora-uploads-')),
+    // Magic link — в тестах письма пишутся в лог (console-sender), реальный SMTP
+    // не поднимается.
+    MAIL_TRANSPORT: 'console',
+    MAIL_FROM: 'Smeteora Test <no-reply@test.smeteora.ru>',
+    SMTP_HOST: undefined,
+    SMTP_PORT: undefined,
+    SMTP_USER: undefined,
+    SMTP_PASSWORD: undefined,
+    SMTP_SECURE: false,
+    FRONTEND_MAGIC_LINK_URL: 'http://localhost:5173/auth/magic',
+    MAGIC_LINK_TTL_MINUTES: 15,
   });
 
   return buildApp(config, overrides);

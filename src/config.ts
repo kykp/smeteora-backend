@@ -47,6 +47,23 @@ const configSchema = z
     // Относительный путь резолвится от cwd (в контейнере это /app).
     // На VPS mount'ится через docker volume /opt/smeteora-api/data:/app/data.
     UPLOADS_DIR: z.string().default('./data/uploads'),
+
+    // ── Magic link / Email ──
+    // MAIL_TRANSPORT=console пишет письма в log.info (dev, тестовые прогоны).
+    // MAIL_TRANSPORT=smtp требует SMTP_* переменные и nodemailer.
+    MAIL_TRANSPORT: z.enum(['console', 'smtp']).default('console'),
+    MAIL_FROM: z.string().default('Smeteora <no-reply@smeteora.ru>'),
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().int().positive().max(65_535).optional(),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASSWORD: z.string().optional(),
+    // Использовать TLS (обычно порт 465). Иначе STARTTLS/plain на 587.
+    SMTP_SECURE: z.coerce.boolean().default(false),
+    // URL фронта — куда кладём ссылку в письме. Обязателен если MAIL_TRANSPORT=smtp;
+    // иначе в console-режиме используем 'http://localhost:5173/auth/magic'.
+    FRONTEND_MAGIC_LINK_URL: z.string().url().default('http://localhost:5173/auth/magic'),
+    // Сколько минут живёт ссылка. Стандарт для magic link — 10-15 минут.
+    MAGIC_LINK_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   })
   .superRefine((cfg, ctx) => {
     const yandex = [
@@ -63,6 +80,18 @@ const configSchema = z
         message: 'YANDEX_OAUTH_* и FRONTEND_OAUTH_* задаются целиком: либо все пять, либо ни одной',
         path: ['YANDEX_OAUTH_CLIENT_ID'],
       });
+    }
+
+    if (cfg.MAIL_TRANSPORT === 'smtp') {
+      const smtp = [cfg.SMTP_HOST, cfg.SMTP_PORT, cfg.SMTP_USER, cfg.SMTP_PASSWORD];
+      const missing = smtp.filter((v) => v === undefined || v === '');
+      if (missing.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'MAIL_TRANSPORT=smtp требует SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD',
+          path: ['SMTP_HOST'],
+        });
+      }
     }
   });
 

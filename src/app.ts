@@ -12,6 +12,7 @@ import authPlugin from './plugins/auth.js';
 import withCompanyContextPlugin from './plugins/with-company-context.js';
 import yandexOAuthPlugin, { buildYandexClientFromConfig } from './plugins/yandex-oauth.js';
 import storagePlugin from './plugins/storage.js';
+import emailPlugin from './plugins/email.js';
 import multipart from '@fastify/multipart';
 import { type YandexOAuthClient } from './modules/auth/yandex-client.js';
 import { healthRoutes } from './routes/health.js';
@@ -121,6 +122,7 @@ export const buildApp = async (
   await app.register(authPlugin);
   await app.register(withCompanyContextPlugin);
   await app.register(storagePlugin);
+  await app.register(emailPlugin);
 
   // Multipart парсер — используется загрузкой логотипа и импортом прайс-листов.
   // Лимит 20 МБ — потолок для файла прайса; логотип отсекается собственной
