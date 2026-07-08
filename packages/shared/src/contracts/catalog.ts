@@ -201,6 +201,22 @@ export const updateProductBodySchema = z
   });
 export type UpdateProductBody = z.infer<typeof updateProductBodySchema>;
 
+// ── Очистка каталога компании ────────────────────────────────────
+// Опасное действие: soft-delete всех своих товаров одним запросом. Обычно
+// используется после тестового залива прайса. Платформенных не касаемся.
+// Требуется подтверждение — юзер вводит имя компании точно как оно записано.
+
+export const clearProductsBodySchema = z.object({
+  // Кассал имени компании — capital/whitespace-insensitive сравнение делаем на сервере.
+  confirm: z.string().trim().min(1).max(500),
+});
+export type ClearProductsBody = z.infer<typeof clearProductsBodySchema>;
+
+export const clearProductsResponseSchema = z.object({
+  deletedCount: z.number().int().min(0),
+});
+export type ClearProductsResponse = z.infer<typeof clearProductsResponseSchema>;
+
 // ── Общие ─────────────────────────────────────────────────────────
 
 export const idParamSchema = z.object({ id: uuidSchema });
@@ -219,6 +235,7 @@ export const catalogPaths = Object.freeze({
   getProduct: (id: string): string => `${PRODUCTS_BASE_PATH}/${id}`,
   updateProduct: (id: string): string => `${PRODUCTS_BASE_PATH}/${id}`,
   deleteProduct: (id: string): string => `${PRODUCTS_BASE_PATH}/${id}`,
+  clearProducts: `${PRODUCTS_BASE_PATH}/clear`,
 
   listCategories: CATEGORIES_BASE_PATH,
   createCategory: CATEGORIES_BASE_PATH,

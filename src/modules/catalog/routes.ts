@@ -5,6 +5,8 @@ import { type Db } from '../../db/client.js';
 import { type AuthContext } from '../../plugins/auth.js';
 import * as service from './service.js';
 import {
+  clearProductsBodySchema,
+  clearProductsResponseSchema,
   createCategoryBodySchema,
   createProductBodySchema,
   idParamSchema,
@@ -152,6 +154,27 @@ export const productsRoutes: FastifyPluginAsyncZod = async (app) => {
       const ctx = assertCtx(request.ctx);
       const tx = assertTx(request.tx);
       return service.listBrands(tx, ctx, request.query);
+    },
+  );
+
+  // ── POST /products/clear ──
+  // Массовый soft-delete всех своих товаров. Роль admin+, тело { confirm }
+  // с именем компании. Регистрируется ДО /:id, чтобы Fastify не считал
+  // «clear» за UUID.
+  app.post(
+    '/clear',
+    {
+      schema: {
+        body: clearProductsBodySchema,
+        response: { 200: clearProductsResponseSchema },
+        tags: ['catalog'],
+      },
+      onRequest: [app.authenticate, requireRole('admin'), app.withCompanyContext],
+    },
+    async (request) => {
+      const ctx = assertCtx(request.ctx);
+      const tx = assertTx(request.tx);
+      return service.clearOwnProducts(tx, ctx, request.body);
     },
   );
 

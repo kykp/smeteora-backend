@@ -326,6 +326,24 @@ export const updateProduct = async (
   return row;
 };
 
+// Массовый soft-delete всех своих товаров компании. Платформенных (company_id IS NULL)
+// не касается — их RLS-политика modify всё равно отсечёт, но явное WHERE-условие
+// делает намерение читаемее.
+export const softDeleteOwnProducts = async (tx: Db, companyId: string): Promise<number> => {
+  const rows = await tx
+    .update(products)
+    .set({ deletedAt: sql`now()` })
+    .where(
+      and(
+        eq(products.companyId, companyId),
+        eq(products.source, 'company'),
+        isNull(products.deletedAt),
+      ),
+    )
+    .returning({ id: products.id });
+  return rows.length;
+};
+
 export const softDeleteProduct = async (
   tx: Db,
   params: { id: string; companyId: string },

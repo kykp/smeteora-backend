@@ -1,9 +1,12 @@
+import { eq } from 'drizzle-orm';
 import { type Db } from '../../db/client.js';
-import { type Product, type ProductCategory, type Unit } from '../../db/schema/index.js';
+import { companies, type Product, type ProductCategory, type Unit } from '../../db/schema/index.js';
 import { NotFoundError, ValidationError } from '../../lib/errors.js';
 import { writeAudit } from '../../lib/audit.js';
 import * as repo from './repo.js';
 import {
+  type ClearProductsBody,
+  type ClearProductsResponse,
   type CreateCategoryBody,
   type CreateProductBody,
   type ListBrandsQuery,
@@ -293,4 +296,39 @@ export const softDeleteProduct = async (
     entityType: 'product',
     entityId: id,
   });
+};
+
+// Массовая очистка каталога — soft-delete всех своих товаров компании.
+// Требует ввод имени компании как «второй ключ» — защита от случайного клика
+// (сама роль admin — первый). Регистр и лишние пробелы не важны.
+export const clearOwnProducts = async (
+  tx: Db,
+  ctx: { companyId: string; userId: string; sessionId: string },
+  body: ClearProductsBody,
+): Promise<ClearProductsResponse> => {
+  const [company] = await tx
+    .select({ name: companies.name })
+    .from(companies)
+    .where(eq(companies.id, ctx.companyId))
+    .limit(1);
+  if (!company) throw new NotFoundError('Компания не найдена');
+
+  const normalize = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (normalize(body.confirm) !== normalize(company.name)) {
+    throw new ValidationError('Название компании не совпадает — операция отменена');
+  }
+
+  const deletedCount = await repo.softDeleteOwnProducts(tx, ctx.companyId);
+
+  await writeAudit(tx, {
+    companyId: ctx.companyId,
+    userId: ctx.userId,
+    sessionId: ctx.sessionId,
+    action: 'catalog.clear',
+    entityType: 'products',
+    entityId: ctx.companyId,
+    meta: { deletedCount },
+  });
+
+  return { deletedCount };
 };

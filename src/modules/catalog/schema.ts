@@ -14,6 +14,8 @@ export {
   updateCategoryBodySchema,
   listCategoriesResponseSchema,
   listUnitsResponseSchema,
+  clearProductsBodySchema,
+  clearProductsResponseSchema,
   idParamSchema,
   okResponseSchema,
   CATALOG_SOURCES,
@@ -33,5 +35,7 @@ export type {
   UpdateCategoryBody,
   ListCategoriesResponse,
   ListUnitsResponse,
+  ClearProductsBody,
+  ClearProductsResponse,
   CatalogSource,
 } from '@smeteora/shared';
