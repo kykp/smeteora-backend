@@ -129,10 +129,14 @@ export const verifyMagicLink = async (db: Db, input: VerifyInput): Promise<Verif
       userId = existingUser.id;
     } else {
       isNewUser = true;
+      // Имя из локальной части email — юзер потом сможет поменять в
+      // настройках профиля. Пусто оставлять нельзя: UI ждёт что-то показать
+      // в аватарке и меню.
+      const localPart = found.email.split('@')[0] ?? found.email;
       const user = await repo.insertUser(tx, {
         email: found.email,
         passwordHash: null,
-        name: null,
+        name: localPart,
       });
       const company = await repo.insertCompany(tx, DEFAULT_COMPANY_NAME);
       await repo.insertMembership(tx, {
