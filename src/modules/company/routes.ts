@@ -1,6 +1,6 @@
 import { type FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { requireRole } from '../../plugins/require-role.js';
-import { UnauthorizedError, ValidationError } from '../../lib/errors.js';
+import { PayloadTooLargeError, UnauthorizedError, ValidationError } from '../../lib/errors.js';
 import { type Db } from '../../db/client.js';
 import * as service from './service.js';
 import * as logoService from './logo-service.js';
@@ -86,8 +86,8 @@ export const companyRoutes: FastifyPluginAsyncZod = async (app) => {
       // fastify-multipart стримит файл — читаем в буфер. Внутри проверим ещё
       // размер, потому что limits в multipart-плагине только обрезает поток.
       const data = await file.toBuffer();
-      if (file.file.truncated) {
-        throw new ValidationError(`Размер файла превышает ${LOGO_MAX_BYTES} байт`);
+      if (file.file.truncated || data.byteLength > LOGO_MAX_BYTES) {
+        throw new PayloadTooLargeError(`Размер файла превышает ${LOGO_MAX_BYTES} байт`);
       }
       await logoService.uploadLogo(tx, app.storage, {
         companyId: ctx.companyId,

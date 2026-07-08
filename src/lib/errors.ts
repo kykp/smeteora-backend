@@ -10,6 +10,7 @@ export type ErrorCode =
   | 'unauthorized'
   | 'validation'
   | 'conflict'
+  | 'payload_too_large'
   | 'rate_limited'
   | 'internal_error';
 
@@ -19,6 +20,7 @@ const STATUS_BY_CODE: Readonly<Record<ErrorCode, number>> = Object.freeze({
   unauthorized: 401,
   validation: 400,
   conflict: 409,
+  payload_too_large: 413,
   rate_limited: 429,
   internal_error: 500,
 });
@@ -79,5 +81,14 @@ export class ConflictError extends DomainError {
 export class RateLimitError extends DomainError {
   constructor(message = 'Слишком много попыток, повторите позже') {
     super('rate_limited', message);
+  }
+}
+
+// Тело запроса (обычно multipart-файл) превышает разрешённый размер.
+// Используется когда сервер сам режет большой аплоад — семантически это 413,
+// а не 400 (валидация тела было бы 400, а «слишком много байт» — 413).
+export class PayloadTooLargeError extends DomainError {
+  constructor(message: string) {
+    super('payload_too_large', message);
   }
 }

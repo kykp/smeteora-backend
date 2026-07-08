@@ -14,3 +14,4 @@ export * from './estimates.js';
 export * from './units.js';
 export * from './product-categories.js';
 export * from './products.js';
+export * from './price-list-uploads.js';

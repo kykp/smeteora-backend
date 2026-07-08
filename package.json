@@ -38,6 +38,7 @@
     "fastify-type-provider-zod": "^4.0.2",
     "pg": "^8.22.0",
     "pino-pretty": "^11.3.0",
+    "xlsx": "0.18.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type Db } from '../../db/client.js';
 import { type FileStorage } from '../../storage/file-storage.js';
-import { NotFoundError, ValidationError } from '../../lib/errors.js';
+import { NotFoundError, PayloadTooLargeError, ValidationError } from '../../lib/errors.js';
 import * as repo from './repo.js';
 import { LOGO_ALLOWED_MIME, LOGO_MAX_BYTES, type LogoMimeType } from './schema.js';
 
@@ -33,7 +33,7 @@ export const uploadLogo = async (
     );
   }
   if (params.data.byteLength > LOGO_MAX_BYTES) {
-    throw new ValidationError(`Размер файла превышает ${LOGO_MAX_BYTES} байт`);
+    throw new PayloadTooLargeError(`Размер файла превышает ${LOGO_MAX_BYTES} байт`);
   }
   if (params.data.byteLength === 0) {
     throw new ValidationError('Пустой файл');

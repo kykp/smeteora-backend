@@ -21,6 +21,7 @@ import { invitationsRoutes } from './modules/invitations/routes.js';
 import { estimatesRoutes } from './modules/estimates/routes.js';
 import { companyRoutes } from './modules/company/routes.js';
 import { productsRoutes, categoriesRoutes, unitsRoutes } from './modules/catalog/routes.js';
+import { priceListsRoutes } from './modules/price-lists/routes.js';
 
 // Опциональные оверрайды для тестов — подменить внешние клиенты (Яндекс и т.п.)
 // на стабы, чтобы интеграционные тесты не ходили в реальный OAuth-провайдер.
@@ -121,11 +122,14 @@ export const buildApp = async (
   await app.register(withCompanyContextPlugin);
   await app.register(storagePlugin);
 
-  // Multipart парсер — используется загрузкой логотипа. Лимит 2 МБ на файл,
-  // один файл на запрос. Больше — 413 Payload Too Large.
+  // Multipart парсер — используется загрузкой логотипа и импортом прайс-листов.
+  // Лимит 20 МБ — потолок для файла прайса; логотип отсекается собственной
+  // проверкой на LOGO_MAX_BYTES (2 МБ) уже внутри роутa.
+  // limits.fileSize не отбрасывает запрос, а лишь помечает поток truncated=true —
+  // роуты обязаны проверять этот флаг вручную.
   await app.register(multipart, {
     limits: {
-      fileSize: 2 * 1024 * 1024,
+      fileSize: 20 * 1024 * 1024,
       files: 1,
       fields: 0,
     },
@@ -153,6 +157,7 @@ export const buildApp = async (
       await v1.register(productsRoutes, { prefix: '/products' });
       await v1.register(categoriesRoutes, { prefix: '/categories' });
       await v1.register(unitsRoutes, { prefix: '/units' });
+      await v1.register(priceListsRoutes, { prefix: '/price-lists' });
     },
     { prefix: API_V1_PREFIX },
   );

@@ -44,6 +44,13 @@ export type CatalogSource = (typeof CATALOG_SOURCES)[number];
 export const CATALOG_OFFER_SOURCES = ['manual', 'csv', 'xlsx', 'pdf', 'api'] as const;
 export type CatalogOfferSource = (typeof CATALOG_OFFER_SOURCES)[number];
 
+// Статус жизненного цикла загрузки прайса.
+//   parsed    — файл разобран, юзер видит превью и настраивает маппинг
+//   committed — маппинг применён, товары upsert'нуты в products
+//   discarded — юзер отменил, файл не пошёл в каталог (мы храним запись как аудит)
+export const PRICE_LIST_UPLOAD_STATUSES = ['parsed', 'committed', 'discarded'] as const;
+export type PriceListUploadStatus = (typeof PRICE_LIST_UPLOAD_STATUSES)[number];
+
 // Иерархия ролей: чем выше индекс — тем больше прав.
 // Используется для проверки "role >= required" в requireRole preHandler.
 export const ROLE_RANK: Readonly<Record<Role, number>> = Object.freeze({
