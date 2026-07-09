@@ -82,7 +82,11 @@ export const switchTo = async (
 // Создаёт проект через API. Возвращает id + отдельный DTO.
 export const createProjectViaApi = async (
   app: FastifyInstance,
-  params: { cookie: string; name: string; status?: 'draft' | 'active' | 'archived' },
+  params: {
+    cookie: string;
+    name: string;
+    status?: 'draft' | 'in-progress' | 'review' | 'sent' | 'won' | 'lost';
+  },
 ): Promise<{ id: string }> => {
   const res = await app.inject({
     method: 'POST',

@@ -102,19 +102,19 @@ describe('projects — CRUD (happy path)', () => {
     expect(body.items.map((p: { id: string }) => p.id)).toEqual([p3.id, p2.id, p1.id]);
   });
 
-  it('GET /projects?status=active — фильтрует по status', async () => {
+  it('GET /projects?status=in-progress — фильтрует по status', async () => {
     const { cookie } = await registerOwner(app, {
       email: 'filter@a.com',
       companyName: 'Фильтр',
     });
 
     await createProjectViaApi(app, { cookie, name: 'Черновик', status: 'draft' });
-    await createProjectViaApi(app, { cookie, name: 'Активный', status: 'active' });
-    await createProjectViaApi(app, { cookie, name: 'Архив', status: 'archived' });
+    await createProjectViaApi(app, { cookie, name: 'В работе', status: 'in-progress' });
+    await createProjectViaApi(app, { cookie, name: 'Выигран', status: 'won' });
 
     const res = await app.inject({
       method: 'GET',
-      url: '/api/v1/projects?status=active',
+      url: '/api/v1/projects?status=in-progress',
       headers: { cookie },
     });
 
@@ -122,7 +122,7 @@ describe('projects — CRUD (happy path)', () => {
     const body = res.json();
     expect(body.total).toBe(1);
     expect(body.items).toHaveLength(1);
-    expect(body.items[0].name).toBe('Активный');
+    expect(body.items[0].name).toBe('В работе');
   });
 
   it('GET /projects?limit=2&offset=1 — пагинация', async () => {
@@ -203,13 +203,13 @@ describe('projects — CRUD (happy path)', () => {
       method: 'PATCH',
       url: `/api/v1/projects/${created.id}`,
       headers: { cookie },
-      payload: { name: 'После', status: 'active' },
+      payload: { name: 'После', status: 'in-progress' },
     });
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.name).toBe('После');
-    expect(body.status).toBe('active');
+    expect(body.status).toBe('in-progress');
     expect(new Date(body.updatedAt).getTime()).toBeGreaterThan(
       new Date(before.json().updatedAt).getTime(),
     );
@@ -374,7 +374,7 @@ describe('projects — CRUD (happy path)', () => {
       method: 'POST',
       url: '/api/v1/projects',
       headers: { cookie },
-      payload: { name: 'X', status: 'in-progress' },
+      payload: { name: 'X', status: 'not-a-status' },
     });
 
     expect(res.statusCode).toBe(400);

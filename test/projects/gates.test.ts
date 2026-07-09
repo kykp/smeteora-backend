@@ -130,7 +130,7 @@ describe('projects — role/session/membership гейты', () => {
       method: 'PATCH',
       url: `/api/v1/projects/${id}`,
       headers: { cookie },
-      payload: { status: 'active' },
+      payload: { status: 'in-progress' },
     });
     expect(patch.statusCode).toBe(200);
 
