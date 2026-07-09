@@ -24,6 +24,11 @@ const toDto = (row: Project): ProjectResponse => ({
   status: row.status,
   startDate: row.startDate,
   endDate: row.endDate,
+  siteObject: row.siteObject,
+  areaM2: row.areaM2,
+  camerasCount: row.camerasCount,
+  equipmentBrand: row.equipmentBrand,
+  budgetRub: row.budgetRub,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
@@ -35,6 +40,12 @@ const emptyToNull = (v: string | null | undefined): string | null => {
   if (v === null) return null;
   const trimmed = v.trim();
   return trimmed.length === 0 ? null : trimmed;
+};
+
+// Nullish-число → null (не задано). Отрицательные бросает zod ещё на входе.
+const numOrNull = (v: number | null | undefined): number | null => {
+  if (v === undefined || v === null) return null;
+  return v;
 };
 
 export const list = async (
@@ -83,6 +94,11 @@ export const create = async (
     status: body.status ?? DEFAULT_STATUS,
     startDate: body.startDate ?? null,
     endDate: body.endDate ?? null,
+    siteObject: emptyToNull(body.siteObject),
+    areaM2: numOrNull(body.areaM2),
+    camerasCount: numOrNull(body.camerasCount),
+    equipmentBrand: emptyToNull(body.equipmentBrand),
+    budgetRub: numOrNull(body.budgetRub),
   });
   return toDto(row);
 };
@@ -104,6 +120,11 @@ export const update = async (
     status?: ProjectStatus;
     startDate?: string | null;
     endDate?: string | null;
+    siteObject?: string | null;
+    areaM2?: number | null;
+    camerasCount?: number | null;
+    equipmentBrand?: string | null;
+    budgetRub?: number | null;
   } = {};
 
   if (body.name !== undefined) patch.name = body.name.trim();
@@ -114,6 +135,11 @@ export const update = async (
   if (body.status !== undefined) patch.status = body.status;
   if (body.startDate !== undefined) patch.startDate = body.startDate;
   if (body.endDate !== undefined) patch.endDate = body.endDate;
+  if (body.siteObject !== undefined) patch.siteObject = emptyToNull(body.siteObject);
+  if (body.areaM2 !== undefined) patch.areaM2 = numOrNull(body.areaM2);
+  if (body.camerasCount !== undefined) patch.camerasCount = numOrNull(body.camerasCount);
+  if (body.equipmentBrand !== undefined) patch.equipmentBrand = emptyToNull(body.equipmentBrand);
+  if (body.budgetRub !== undefined) patch.budgetRub = numOrNull(body.budgetRub);
 
   const row = await repo.update(tx, { id, companyId: ctx.companyId, patch });
   if (!row) throw new NotFoundError('Проект не найден');

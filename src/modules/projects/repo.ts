@@ -69,6 +69,11 @@ type InsertInput = {
   status: ProjectStatus;
   startDate: string | null;
   endDate: string | null;
+  siteObject: string | null;
+  areaM2: number | null;
+  camerasCount: number | null;
+  equipmentBrand: string | null;
+  budgetRub: number | null;
 };
 
 export const insert = async (tx: Db, params: InsertInput): Promise<Project> => {
@@ -87,6 +92,11 @@ type PatchInput = {
   status?: ProjectStatus;
   startDate?: string | null;
   endDate?: string | null;
+  siteObject?: string | null;
+  areaM2?: number | null;
+  camerasCount?: number | null;
+  equipmentBrand?: string | null;
+  budgetRub?: number | null;
 };
 
 export const update = async (

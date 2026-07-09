@@ -215,6 +215,47 @@ describe('projects — CRUD (happy path)', () => {
     );
   });
 
+  it('PATCH /projects/:id — прикладные метрики сохраняются и возвращаются', async () => {
+    const { cookie } = await registerOwner(app, {
+      email: 'metrics@a.com',
+      companyName: 'Metrics',
+    });
+
+    const created = await createProjectViaApi(app, { cookie, name: 'X' });
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/projects/${created.id}`,
+      headers: { cookie },
+      payload: {
+        siteObject: 'Паркинг',
+        areaM2: 1200,
+        camerasCount: 16,
+        equipmentBrand: 'Hikvision',
+        budgetRub: 3_500_000,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.siteObject).toBe('Паркинг');
+    expect(body.areaM2).toBe(1200);
+    expect(body.camerasCount).toBe(16);
+    expect(body.equipmentBrand).toBe('Hikvision');
+    expect(body.budgetRub).toBe(3_500_000);
+
+    // null очищает поле — как и для description
+    const cleared = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/projects/${created.id}`,
+      headers: { cookie },
+      payload: { areaM2: null, equipmentBrand: null },
+    });
+    expect(cleared.statusCode).toBe(200);
+    expect(cleared.json().areaM2).toBeNull();
+    expect(cleared.json().equipmentBrand).toBeNull();
+  });
+
   it('PATCH /projects/:id — description=null очищает поле', async () => {
     const { cookie } = await registerOwner(app, {
       email: 'clr@a.com',

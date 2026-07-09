@@ -18,6 +18,13 @@ export const PROJECT_DESCRIPTION_MAX = 4000;
 export const PROJECT_ADDRESS_MAX = 500;
 export const PROJECT_CLIENT_NAME_MAX = 200;
 export const PROJECT_CLIENT_PHONE_MAX = 40;
+export const PROJECT_SITE_OBJECT_MAX = 200;
+export const PROJECT_EQUIPMENT_BRAND_MAX = 200;
+// Максимумы — integer постгреса ≈ 2.1 млрд. Ограничиваем меньше, чтобы
+// нечаянный ввод «999999999999» не проходил в БД, а падал на валидации.
+export const PROJECT_AREA_M2_MAX = 10_000_000;
+export const PROJECT_CAMERAS_MAX = 100_000;
+export const PROJECT_BUDGET_RUB_MAX = 2_000_000_000;
 
 export const PROJECT_LIST_DEFAULT_LIMIT = 20;
 export const PROJECT_LIST_MAX_LIMIT = 100;
@@ -35,6 +42,8 @@ const isoDateSchema = z
 // каждом проекте бессмысленно. RLS + auth-гейт гарантируют что клиент
 // физически не увидит проекты чужой компании.
 
+const nonNegativeInt = (max: number) => z.number().int().min(0).max(max).nullable();
+
 export const projectSchema = z.object({
   id: uuidSchema,
   name: z.string().min(PROJECT_NAME_MIN).max(PROJECT_NAME_MAX),
@@ -45,12 +54,19 @@ export const projectSchema = z.object({
   status: z.enum(PROJECT_STATUSES),
   startDate: isoDateSchema,
   endDate: isoDateSchema,
+  siteObject: nullableString(PROJECT_SITE_OBJECT_MAX),
+  areaM2: nonNegativeInt(PROJECT_AREA_M2_MAX),
+  camerasCount: nonNegativeInt(PROJECT_CAMERAS_MAX),
+  equipmentBrand: nullableString(PROJECT_EQUIPMENT_BRAND_MAX),
+  budgetRub: nonNegativeInt(PROJECT_BUDGET_RUB_MAX),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
 export type ProjectDto = z.infer<typeof projectSchema>;
 
 // ── Request/Response схемы ───────────────────────────────────────
+
+const nonNegativeIntInput = (max: number) => z.number().int().min(0).max(max).nullish();
 
 export const createProjectBodySchema = z.object({
   name: z.string().trim().min(PROJECT_NAME_MIN).max(PROJECT_NAME_MAX),
@@ -61,6 +77,11 @@ export const createProjectBodySchema = z.object({
   status: z.enum(PROJECT_STATUSES).optional(),
   startDate: isoDateSchema.optional(),
   endDate: isoDateSchema.optional(),
+  siteObject: z.string().trim().max(PROJECT_SITE_OBJECT_MAX).nullish(),
+  areaM2: nonNegativeIntInput(PROJECT_AREA_M2_MAX),
+  camerasCount: nonNegativeIntInput(PROJECT_CAMERAS_MAX),
+  equipmentBrand: z.string().trim().max(PROJECT_EQUIPMENT_BRAND_MAX).nullish(),
+  budgetRub: nonNegativeIntInput(PROJECT_BUDGET_RUB_MAX),
 });
 export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
 
@@ -75,6 +96,11 @@ export const updateProjectBodySchema = z
     status: z.enum(PROJECT_STATUSES).optional(),
     startDate: isoDateSchema.optional(),
     endDate: isoDateSchema.optional(),
+    siteObject: z.string().trim().max(PROJECT_SITE_OBJECT_MAX).nullish(),
+    areaM2: nonNegativeIntInput(PROJECT_AREA_M2_MAX),
+    camerasCount: nonNegativeIntInput(PROJECT_CAMERAS_MAX),
+    equipmentBrand: z.string().trim().max(PROJECT_EQUIPMENT_BRAND_MAX).nullish(),
+    budgetRub: nonNegativeIntInput(PROJECT_BUDGET_RUB_MAX),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: 'Нужно передать хотя бы одно поле для обновления',

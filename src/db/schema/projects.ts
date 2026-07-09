@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, date, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, date, integer, index } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { companies } from './companies.js';
 import { PROJECT_STATUSES } from '../constants.js';
@@ -22,6 +22,13 @@ export const projects = pgTable(
     status: text('status', { enum: PROJECT_STATUSES }).notNull().default('draft'),
     startDate: date('start_date'),
     endDate: date('end_date'),
+    // Прикладные метрики монтажников. Все опциональны — заполняются в
+    // модалке параметров проекта; NULL = «не указано», в UI показываем как 0.
+    siteObject: text('site_object'),
+    areaM2: integer('area_m2'),
+    camerasCount: integer('cameras_count'),
+    equipmentBrand: text('equipment_brand'),
+    budgetRub: integer('budget_rub'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
