@@ -9,7 +9,7 @@ export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];
 export const INVITATION_STATUSES = ['pending', 'accepted', 'revoked', 'expired'] as const;
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 
-export const PROJECT_STATUSES = ['draft', 'active', 'archived'] as const;
+export const PROJECT_STATUSES = ['draft', 'in-progress', 'review', 'sent', 'won', 'lost'] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
 export const ESTIMATE_STATUSES = ['draft', 'sent', 'approved', 'rejected', 'archived'] as const;

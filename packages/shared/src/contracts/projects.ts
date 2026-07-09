@@ -5,7 +5,10 @@ import { z } from 'zod';
 // для генерации типов SDK. Обёртка через @ts-rest — следующий шаг, когда фронт
 // начнёт активно потреблять контракт; сейчас достаточно zod-схем + констант путей.
 
-export const PROJECT_STATUSES = ['draft', 'active', 'archived'] as const;
+// Жизненный цикл проекта/сметы, юзер меняет вручную. Порядок значений — как
+// естественный флоу движения: черновик → работа → согласование → отправлено →
+// финал (выиграли/проиграли).
+export const PROJECT_STATUSES = ['draft', 'in-progress', 'review', 'sent', 'won', 'lost'] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
 const uuidSchema = z.string().uuid();
