@@ -324,6 +324,13 @@ export const upsertTreeBodySchema = z
   });
 export type UpsertTreeBody = z.infer<typeof upsertTreeBodySchema>;
 
+// ── Патч шапки (PATCH /:id) ─────────────────────────────────────
+// Отдельный эндпоинт для частичных изменений шапки — без пересборки дерева.
+// Основной кейс: синхронизация title сметы при переименовании проекта.
+// projectId менять нельзя — для этого будет отдельный move-эндпоинт.
+export const updateEstimateBodySchema = treeHeaderPatchSchema;
+export type UpdateEstimateBody = z.infer<typeof updateEstimateBodySchema>;
+
 // ── Прочие мелкие схемы ──────────────────────────────────────────
 
 export const estimateIdParamSchema = z.object({ id: uuidSchema });
@@ -338,6 +345,7 @@ export const estimatesPaths = Object.freeze({
   list: ESTIMATES_BASE_PATH,
   create: ESTIMATES_BASE_PATH,
   getOne: (id: string): string => `${ESTIMATES_BASE_PATH}/${id}`,
+  update: (id: string): string => `${ESTIMATES_BASE_PATH}/${id}`,
   upsertTree: (id: string): string => `${ESTIMATES_BASE_PATH}/${id}/tree`,
   delete: (id: string): string => `${ESTIMATES_BASE_PATH}/${id}`,
 });

@@ -11,6 +11,7 @@ import {
   estimateTreeResponseSchema,
   listEstimatesQuerySchema,
   listEstimatesResponseSchema,
+  updateEstimateBodySchema,
   upsertTreeBodySchema,
 } from './schema.js';
 
@@ -83,6 +84,26 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
       const created = await service.create(tx, ctx, request.body);
       void reply.status(201);
       return created;
+    },
+  );
+
+  // ── PATCH /estimates/:id ────────────────────────────────────────
+  // Частичное обновление шапки (title/notes/…) без пересборки дерева.
+  app.patch(
+    '/:id',
+    {
+      schema: {
+        params: estimateIdParamSchema,
+        body: updateEstimateBodySchema,
+        response: { 200: estimateTreeResponseSchema },
+        tags: ['estimates'],
+      },
+      onRequest: [app.authenticate, requireRole('member'), app.withCompanyContext],
+    },
+    async (request) => {
+      const ctx = assertCtx(request.ctx);
+      const tx = assertTx(request.tx);
+      return service.updateHeader(tx, ctx, request.params.id, request.body);
     },
   );
 

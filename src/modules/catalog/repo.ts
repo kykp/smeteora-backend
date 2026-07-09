@@ -214,7 +214,11 @@ export const listProducts = async (
 // сверху самые «наполненные» бренды, разрывы по алфавиту.
 export const listBrands = async (
   tx: Db,
-  params: { companyId: string; scope: 'all' | 'own' | 'platform' },
+  params: {
+    companyId: string;
+    scope: 'all' | 'own' | 'platform';
+    categoryIds?: string[] | undefined;
+  },
 ): Promise<Array<{ brand: string; count: number }>> => {
   const scopeCond =
     params.scope === 'own'
@@ -223,15 +227,23 @@ export const listBrands = async (
         ? isNull(products.companyId)
         : (or(eq(products.companyId, params.companyId), isNull(products.companyId)) ?? sql`false`);
 
+  const conditions = [
+    isNull(products.deletedAt),
+    isNotNull(products.brand),
+    ne(products.brand, ''),
+    scopeCond,
+  ];
+  if (params.categoryIds && params.categoryIds.length > 0) {
+    conditions.push(inArray(products.categoryId, params.categoryIds));
+  }
+
   const rows = await tx
     .select({
       brand: products.brand,
       count: count(),
     })
     .from(products)
-    .where(
-      and(isNull(products.deletedAt), isNotNull(products.brand), ne(products.brand, ''), scopeCond),
-    )
+    .where(and(...conditions))
     .groupBy(products.brand)
     .orderBy(desc(count()), asc(products.brand));
 

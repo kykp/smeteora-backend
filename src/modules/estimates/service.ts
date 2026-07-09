@@ -23,6 +23,7 @@ import {
   type EstimateTreeResponse,
   type ListEstimatesQuery,
   type ListEstimatesResponse,
+  type UpdateEstimateBody,
   type UpsertTreeBody,
 } from './schema.js';
 
@@ -295,6 +296,54 @@ export const upsertTree = async (
     repo.listLineItemsByEstimate(tx, { estimateId: est.id, companyId: ctx.companyId }),
   ]);
   return assembleTree(tx, ctx, updatedEstimate, freshSections, freshItems);
+};
+
+// ── Update header (PATCH /:id) ─────────────────────────────────
+// Частичное обновление шапки без пересборки дерева. Основной кейс — синхронизация
+// title сметы с name проекта при переименовании. Логика проверок та же что в
+// upsertTree.estimate-ветке; общий хелпер выделять сейчас нет смысла — две
+// точки использования.
+
+export const updateHeader = async (
+  tx: Db,
+  ctx: { companyId: string },
+  id: string,
+  body: UpdateEstimateBody,
+): Promise<EstimateTreeResponse> => {
+  const est = await repo.findEstimateById(tx, { id, companyId: ctx.companyId });
+  if (!est) throw new NotFoundError('Смета не найдена');
+
+  const patch: repo.UpdateEstimateHeader = {};
+  if (body.number !== undefined)
+    patch.number = body.number == null || body.number === '' ? null : body.number;
+  if (body.title !== undefined) patch.title = body.title.trim();
+  if (body.currency !== undefined) patch.currency = body.currency;
+  if (body.vatMode !== undefined) patch.vatMode = body.vatMode as VatMode;
+  if (body.vatRate !== undefined) patch.vatRate = body.vatRate ?? null;
+  if (body.discountPercent !== undefined) patch.discountPercent = body.discountPercent ?? null;
+  if (body.discountAmount !== undefined) patch.discountAmount = body.discountAmount ?? null;
+  if (body.notes !== undefined)
+    patch.notes = body.notes == null || body.notes === '' ? null : body.notes;
+  if (body.meta !== undefined) patch.meta = body.meta;
+
+  const resolvedVatMode = patch.vatMode ?? est.vatMode;
+  const resolvedVatRate = patch.vatRate !== undefined ? patch.vatRate : est.vatRate;
+  if (resolvedVatMode !== 'none' && resolvedVatRate == null) {
+    throw new ValidationError('При vatMode != none нужно задать vatRate');
+  }
+
+  const updated = await repo.updateEstimateHeader(tx, {
+    id: est.id,
+    companyId: ctx.companyId,
+    patch,
+  });
+  if (!updated) throw new NotFoundError('Смета не найдена');
+
+  const [sections, items] = await Promise.all([
+    repo.listSectionsByEstimate(tx, { estimateId: updated.id, companyId: ctx.companyId }),
+    repo.listLineItemsByEstimate(tx, { estimateId: updated.id, companyId: ctx.companyId }),
+  ]);
+  return assembleTree(tx, ctx, updated, sections, items);
 };
 
 // ── Soft delete ────────────────────────────────────────────────

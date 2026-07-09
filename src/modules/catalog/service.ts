@@ -159,6 +159,7 @@ export const listBrands = async (
   const items = await repo.listBrands(tx, {
     companyId: ctx.companyId,
     scope: query.scope,
+    categoryIds: query.categoryId,
   });
   return { items };
 };

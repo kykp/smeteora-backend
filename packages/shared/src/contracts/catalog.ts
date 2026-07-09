@@ -145,8 +145,12 @@ export type ListProductsQuery = z.infer<typeof listProductsQuerySchema>;
 
 // Отдельный endpoint для стабильного списка брендов независимо от пагинации.
 // Сортировка по бэку: count DESC, brand ASC. Пустые/null бренды не попадают.
+// Опциональный categoryId фильтрует бренды по выбранным категориям — нужен
+// сметчику: справа юзер видит только те бренды, у которых есть товары в
+// текущей категории.
 export const listBrandsQuerySchema = z.object({
   scope: z.enum(['all', 'own', 'platform']).default('own'),
+  categoryId: multiUuidField,
 });
 export type ListBrandsQuery = z.infer<typeof listBrandsQuerySchema>;
 
