@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import type {
   AutoMapping,
@@ -218,6 +218,16 @@ const cellAt = (row: string[], idx: number | null): string => {
 // целиком, а юзеру полезнее «привезли, но обрезали до 500 символов».
 const truncate = (s: string, max: number): string => (s.length > max ? s.slice(0, max) : s);
 
+// Автогенерация артикула для строк, где юзер не привёл SKU. Детерминированный
+// hash от (name + brand) — при повторном импорте того же товара получим тот же
+// AUTO-код, и upsert по (companyId, sku) сработает. Без этого второй импорт
+// одного и того же прайса без SKU дал бы полные дубли.
+const autoSku = (name: string, brand: string | null): string => {
+  const source = `${name.trim().toLowerCase()}|${(brand ?? '').trim().toLowerCase()}`;
+  const hash = createHash('sha1').update(source).digest('hex').slice(0, 10).toUpperCase();
+  return `AUTO-${hash}`;
+};
+
 // Валидация индексов маппинга: должны быть в диапазоне заголовков.
 const validateMapping = (mapping: CommitMapping, headersLength: number): void => {
   const check = (label: string, idx: number | null): void => {
@@ -311,11 +321,15 @@ export const commitPriceList = async (
         continue;
       }
 
-      const rawSku = cellAt(row, body.mapping.sku);
-      const sku = rawSku.length > 0 ? truncate(rawSku, PRICE_LIST_FIELD_MAX.sku) : null;
-
       const rawBrand = cellAt(row, body.mapping.brand);
       const brand = rawBrand.length > 0 ? truncate(rawBrand, PRICE_LIST_FIELD_MAX.brand) : null;
+
+      // SKU: используем из файла если есть, иначе генерируем AUTO-hash от
+      // name+brand — так повторный импорт того же товара обновит существующий,
+      // а не создаст дубль.
+      const rawSku = cellAt(row, body.mapping.sku);
+      const sku =
+        rawSku.length > 0 ? truncate(rawSku, PRICE_LIST_FIELD_MAX.sku) : autoSku(name, brand);
 
       const rawDesc = cellAt(row, body.mapping.description);
       const description =
@@ -364,22 +378,20 @@ export const commitPriceList = async (
         continue;
       }
 
-      // Upsert. Ищем существующий по (companyId, sku) — если sku указан.
-      let existingId: string | null = null;
-      if (sku !== null) {
-        const existing = await tx
-          .select({ id: products.id })
-          .from(products)
-          .where(
-            and(
-              eq(products.companyId, ctx.companyId),
-              eq(products.sku, sku),
-              isNull(products.deletedAt),
-            ),
-          )
-          .limit(1);
-        existingId = existing[0]?.id ?? null;
-      }
+      // Upsert по (companyId, sku). SKU теперь всегда есть (либо из файла,
+      // либо AUTO-hash), поэтому проверка на null больше не нужна.
+      const existing = await tx
+        .select({ id: products.id })
+        .from(products)
+        .where(
+          and(
+            eq(products.companyId, ctx.companyId),
+            eq(products.sku, sku),
+            isNull(products.deletedAt),
+          ),
+        )
+        .limit(1);
+      const existingId: string | null = existing[0]?.id ?? null;
 
       if (existingId !== null) {
         // Обновляем только цены, которые юзер замаппил — иначе оставляем
