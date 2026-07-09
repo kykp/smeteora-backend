@@ -48,7 +48,7 @@ const configSchema = z
     // На VPS mount'ится через docker volume /opt/smeteora-api/data:/app/data.
     UPLOADS_DIR: z.string().default('./data/uploads'),
 
-    // ── Magic link / Email ──
+    // ── Email OTP ──
     // MAIL_TRANSPORT=console пишет письма в log.info (dev, тестовые прогоны).
     // MAIL_TRANSPORT=smtp требует SMTP_* переменные и nodemailer.
     MAIL_TRANSPORT: z.enum(['console', 'smtp']).default('console'),
@@ -59,11 +59,9 @@ const configSchema = z
     SMTP_PASSWORD: z.string().optional(),
     // Использовать TLS (обычно порт 465). Иначе STARTTLS/plain на 587.
     SMTP_SECURE: z.coerce.boolean().default(false),
-    // URL фронта — куда кладём ссылку в письме. Обязателен если MAIL_TRANSPORT=smtp;
-    // иначе в console-режиме используем 'http://localhost:5173/auth/magic'.
-    FRONTEND_MAGIC_LINK_URL: z.string().url().default('http://localhost:5173/auth/magic'),
-    // Сколько минут живёт ссылка. Стандарт для magic link — 10-15 минут.
-    MAGIC_LINK_TTL_MINUTES: z.coerce.number().int().positive().default(15),
+    // Сколько минут живёт код. Короче чем у magic-link, потому что юзер
+    // держит вкладку открытой и вводит код сразу, а не откладывает на позже.
+    EMAIL_OTP_TTL_MINUTES: z.coerce.number().int().positive().default(10),
   })
   .superRefine((cfg, ctx) => {
     const yandex = [

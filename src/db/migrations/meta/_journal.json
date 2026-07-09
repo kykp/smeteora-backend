@@ -92,6 +92,13 @@
       "when": 1783580669721,
       "tag": "0012_unknown_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1783667069721,
+      "tag": "0013_replace_magic_link_with_email_otp",
+      "breakpoints": true
     }
   ]
 }

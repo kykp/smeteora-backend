@@ -17,8 +17,9 @@ export type AuthResult = {
   response: AuthUserResponse;
 };
 
-// Единый сборщик /me-ответа. Используется register, login, /me и switch-company.
-const buildAuthResponse = async (
+// Единый сборщик /me-ответа. Используется register, login, /me, switch-company
+// и email-OTP verify.
+export const buildAuthResponse = async (
   db: Db,
   params: { userId: string; membershipId: string },
 ): Promise<AuthUserResponse> => {

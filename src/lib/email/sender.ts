@@ -1,13 +1,13 @@
-// Абстракция отправки email. Единственная реализация в проекте у magic-link,
+// Абстракция отправки email. Единственная реализация в проекте у email-OTP,
 // но интерфейс общий — потом сюда попадут «сброс пароля», «уведомление о
 // платеже», etc. Прод-реализация подменяется через plugins/email.ts на SMTP.
 
-export type MagicLinkEmail = {
+export type EmailOtpEmail = {
   readonly to: string;
-  readonly link: string;
+  readonly code: string;
   readonly ttlMinutes: number;
 };
 
 export interface EmailSender {
-  readonly sendMagicLink: (params: MagicLinkEmail) => Promise<void>;
+  readonly sendEmailOtp: (params: EmailOtpEmail) => Promise<void>;
 }

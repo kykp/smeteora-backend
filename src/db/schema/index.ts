@@ -15,4 +15,4 @@ export * from './units.js';
 export * from './product-categories.js';
 export * from './products.js';
 export * from './price-list-uploads.js';
-export * from './magic-link-tokens.js';
+export * from './email-otp-codes.js';

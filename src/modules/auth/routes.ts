@@ -16,7 +16,7 @@ import {
   updateMeBodySchema,
 } from './schema.js';
 import { yandexAuthRoutes } from './yandex-routes.js';
-import { magicLinkRoutes } from './magic-link-routes.js';
+import { emailOtpRoutes } from './email-otp-routes.js';
 
 // Жёсткий rate limit на auth-роуты — защита от brute-force.
 // В test-env выключается — интеграционные тесты за секунды делают десятки регистраций.
@@ -197,5 +197,5 @@ export const authRoutes: FastifyPluginAsyncZod = async (app) => {
   // Yandex OAuth — под тем же /auth-префиксом что и остальные auth-роуты.
   // Отделён от email+password флоу, чтобы структура файлов не разрослась.
   await app.register(yandexAuthRoutes);
-  await app.register(magicLinkRoutes);
+  await app.register(emailOtpRoutes);
 };

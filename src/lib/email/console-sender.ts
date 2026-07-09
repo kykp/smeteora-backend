@@ -1,7 +1,7 @@
 import { type FastifyBaseLogger } from 'fastify';
-import { type EmailSender, type MagicLinkEmail } from './sender.js';
+import { type EmailSender, type EmailOtpEmail } from './sender.js';
 
-// Dev/test-реализация. Пишет ссылку в лог, чтобы её можно было скопировать
+// Dev/test-реализация. Пишет код в лог, чтобы его можно было скопировать
 // вручную. Никакого реального SMTP-подключения — работает без сети.
 //
 // Использование в проде — валидная ошибка конфига (config.ts падает, если
@@ -9,10 +9,10 @@ import { type EmailSender, type MagicLinkEmail } from './sender.js';
 export class ConsoleEmailSender implements EmailSender {
   constructor(private readonly log: FastifyBaseLogger) {}
 
-  async sendMagicLink(params: MagicLinkEmail): Promise<void> {
+  async sendEmailOtp(params: EmailOtpEmail): Promise<void> {
     this.log.info(
-      { to: params.to, link: params.link, ttlMinutes: params.ttlMinutes },
-      '[email] magic-link (console): ссылка ниже, скопируй и открой в браузере',
+      { to: params.to, code: params.code, ttlMinutes: params.ttlMinutes },
+      '[email] email-otp (console): код ниже, введи его в форме входа',
     );
   }
 }

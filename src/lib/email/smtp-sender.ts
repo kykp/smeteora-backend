@@ -1,5 +1,5 @@
 import nodemailer, { type Transporter } from 'nodemailer';
-import { type EmailSender, type MagicLinkEmail } from './sender.js';
+import { type EmailSender, type EmailOtpEmail } from './sender.js';
 
 export type SmtpConfig = {
   readonly host: string;
@@ -26,20 +26,22 @@ export class SmtpEmailSender implements EmailSender {
     this.from = cfg.from;
   }
 
-  async sendMagicLink(params: MagicLinkEmail): Promise<void> {
-    const subject = 'Вход в Smeteora — ссылка внутри';
+  async sendEmailOtp(params: EmailOtpEmail): Promise<void> {
+    const subject = `Код для входа в Smeteora: ${params.code}`;
     const text = [
       'Привет!',
       '',
-      'Кто-то запросил вход в Smeteora по этому адресу. Если это ты — открой',
-      'ссылку ниже. Она живёт следующие ' + params.ttlMinutes + ' минут и работает один раз.',
+      'Кто-то запросил вход в Smeteora по этому адресу. Если это ты — введи',
+      'в форме входа этот код:',
       '',
-      params.link,
+      '    ' + params.code,
+      '',
+      'Код живёт следующие ' + params.ttlMinutes + ' минут и работает один раз.',
       '',
       'Если это не ты — просто проигнорируй письмо, ничего не произойдёт.',
     ].join('\n');
 
-    const html = renderHtml(params.link, params.ttlMinutes);
+    const html = renderHtml(params.code, params.ttlMinutes);
 
     await this.transport.sendMail({
       from: this.from,
@@ -53,7 +55,7 @@ export class SmtpEmailSender implements EmailSender {
 
 // Инлайновая HTML-вёрстка — почтовые клиенты душат внешние стили,
 // поэтому всё сразу в атрибутах и минимально.
-const renderHtml = (link: string, ttlMinutes: number): string => `
+const renderHtml = (code: string, ttlMinutes: number): string => `
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"/></head>
 <body style="font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f7f8fa; margin:0; padding:32px;">
@@ -61,18 +63,14 @@ const renderHtml = (link: string, ttlMinutes: number): string => `
     <tr><td>
       <div style="font-size:22px; font-weight:800; color:#0f172a; margin-bottom:16px;">Вход в Smeteora</div>
       <p style="color:#334155; font-size:15px; line-height:1.5; margin:0 0 24px;">
-        Кто-то запросил вход по этому адресу. Если это ты — нажми кнопку ниже.
-        Ссылка живёт ${ttlMinutes} минут и работает один раз.
+        Кто-то запросил вход по этому адресу. Если это ты — введи код ниже в
+        форме входа. Код живёт ${ttlMinutes} минут и работает один раз.
       </p>
-      <p style="margin:0 0 24px;">
-        <a href="${link}" style="display:inline-block; background:#2563eb; color:#ffffff; text-decoration:none; padding:12px 20px; border-radius:8px; font-weight:600;">
-          Открыть Smeteora
-        </a>
-      </p>
-      <p style="color:#64748b; font-size:13px; line-height:1.5; margin:0;">
-        Кнопка не работает? Скопируй адрес и открой в браузере:<br/>
-        <span style="color:#2563eb; word-break:break-all;">${link}</span>
-      </p>
+      <div style="margin:0 0 24px; text-align:center;">
+        <div style="display:inline-block; background:#f1f5f9; color:#0f172a; padding:16px 24px; border-radius:8px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size:32px; font-weight:700; letter-spacing:8px;">
+          ${code}
+        </div>
+      </div>
       <hr style="border:none; border-top:1px solid #e2e5ea; margin:24px 0;"/>
       <p style="color:#94a3b8; font-size:12px; line-height:1.5; margin:0;">
         Если письмо пришло по ошибке — просто удали его. Никаких действий с твоей учётной записью не произойдёт.
