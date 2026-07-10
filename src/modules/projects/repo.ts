@@ -66,6 +66,8 @@ type InsertInput = {
   address: string | null;
   clientName: string | null;
   clientPhone: string | null;
+  clientInn: string | null;
+  clientAddress: string | null;
   status: ProjectStatus;
   startDate: string | null;
   endDate: string | null;
@@ -89,6 +91,8 @@ type PatchInput = {
   address?: string | null;
   clientName?: string | null;
   clientPhone?: string | null;
+  clientInn?: string | null;
+  clientAddress?: string | null;
   status?: ProjectStatus;
   startDate?: string | null;
   endDate?: string | null;

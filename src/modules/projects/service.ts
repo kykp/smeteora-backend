@@ -21,6 +21,8 @@ const toDto = (row: Project): ProjectResponse => ({
   address: row.address,
   clientName: row.clientName,
   clientPhone: row.clientPhone,
+  clientInn: row.clientInn,
+  clientAddress: row.clientAddress,
   status: row.status,
   startDate: row.startDate,
   endDate: row.endDate,
@@ -91,6 +93,8 @@ export const create = async (
     address: emptyToNull(body.address),
     clientName: emptyToNull(body.clientName),
     clientPhone: emptyToNull(body.clientPhone),
+    clientInn: emptyToNull(body.clientInn),
+    clientAddress: emptyToNull(body.clientAddress),
     status: body.status ?? DEFAULT_STATUS,
     startDate: body.startDate ?? null,
     endDate: body.endDate ?? null,
@@ -117,6 +121,8 @@ export const update = async (
     address?: string | null;
     clientName?: string | null;
     clientPhone?: string | null;
+    clientInn?: string | null;
+    clientAddress?: string | null;
     status?: ProjectStatus;
     startDate?: string | null;
     endDate?: string | null;
@@ -132,6 +138,8 @@ export const update = async (
   if (body.address !== undefined) patch.address = emptyToNull(body.address);
   if (body.clientName !== undefined) patch.clientName = emptyToNull(body.clientName);
   if (body.clientPhone !== undefined) patch.clientPhone = emptyToNull(body.clientPhone);
+  if (body.clientInn !== undefined) patch.clientInn = emptyToNull(body.clientInn);
+  if (body.clientAddress !== undefined) patch.clientAddress = emptyToNull(body.clientAddress);
   if (body.status !== undefined) patch.status = body.status;
   if (body.startDate !== undefined) patch.startDate = body.startDate;
   if (body.endDate !== undefined) patch.endDate = body.endDate;

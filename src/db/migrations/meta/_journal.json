@@ -99,6 +99,13 @@
       "when": 1783667069721,
       "tag": "0013_replace_magic_link_with_email_otp",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1783621617050,
+      "tag": "0014_rainy_veda",
+      "breakpoints": true
     }
   ]
 }

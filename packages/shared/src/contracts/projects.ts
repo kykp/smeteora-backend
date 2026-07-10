@@ -21,6 +21,12 @@ export const PROJECT_DESCRIPTION_MAX = 4000;
 export const PROJECT_ADDRESS_MAX = 500;
 export const PROJECT_CLIENT_NAME_MAX = 200;
 export const PROJECT_CLIENT_PHONE_MAX = 40;
+// ИНН российской организации: 10 цифр (юрлицо) или 12 (ИП/самозанятый).
+// Держим текстом с regex-валидацией, а не integer'ом — ведущие нули важны,
+// плюс избегаем bigint-overflow.
+export const PROJECT_CLIENT_INN_MAX = 12;
+export const PROJECT_CLIENT_INN_PATTERN = /^\d{10}$|^\d{12}$/;
+export const PROJECT_CLIENT_ADDRESS_MAX = 500;
 export const PROJECT_SITE_OBJECT_MAX = 200;
 export const PROJECT_EQUIPMENT_BRAND_MAX = 200;
 // Максимумы — integer постгреса ≈ 2.1 млрд. Ограничиваем меньше, чтобы
@@ -47,6 +53,13 @@ const isoDateSchema = z
 
 const nonNegativeInt = (max: number) => z.number().int().min(0).max(max).nullable();
 
+// ИНН заказчика — либо null, либо строка ровно из 10 или 12 цифр.
+const clientInnSchema = z
+  .string()
+  .max(PROJECT_CLIENT_INN_MAX)
+  .regex(PROJECT_CLIENT_INN_PATTERN, 'ИНН должен содержать 10 или 12 цифр')
+  .nullable();
+
 export const projectSchema = z.object({
   id: uuidSchema,
   name: z.string().min(PROJECT_NAME_MIN).max(PROJECT_NAME_MAX),
@@ -54,6 +67,8 @@ export const projectSchema = z.object({
   address: nullableString(PROJECT_ADDRESS_MAX),
   clientName: nullableString(PROJECT_CLIENT_NAME_MAX),
   clientPhone: nullableString(PROJECT_CLIENT_PHONE_MAX),
+  clientInn: clientInnSchema,
+  clientAddress: nullableString(PROJECT_CLIENT_ADDRESS_MAX),
   status: z.enum(PROJECT_STATUSES),
   startDate: isoDateSchema,
   endDate: isoDateSchema,
@@ -71,12 +86,25 @@ export type ProjectDto = z.infer<typeof projectSchema>;
 
 const nonNegativeIntInput = (max: number) => z.number().int().min(0).max(max).nullish();
 
+// ИНН на входе — пустая строка → null; иначе строгий regex.
+const clientInnInputSchema = z
+  .union([
+    z.string().length(0),
+    z
+      .string()
+      .max(PROJECT_CLIENT_INN_MAX)
+      .regex(PROJECT_CLIENT_INN_PATTERN, 'ИНН должен содержать 10 или 12 цифр'),
+  ])
+  .nullish();
+
 export const createProjectBodySchema = z.object({
   name: z.string().trim().min(PROJECT_NAME_MIN).max(PROJECT_NAME_MAX),
   description: z.string().trim().max(PROJECT_DESCRIPTION_MAX).nullish(),
   address: z.string().trim().max(PROJECT_ADDRESS_MAX).nullish(),
   clientName: z.string().trim().max(PROJECT_CLIENT_NAME_MAX).nullish(),
   clientPhone: z.string().trim().max(PROJECT_CLIENT_PHONE_MAX).nullish(),
+  clientInn: clientInnInputSchema,
+  clientAddress: z.string().trim().max(PROJECT_CLIENT_ADDRESS_MAX).nullish(),
   status: z.enum(PROJECT_STATUSES).optional(),
   startDate: isoDateSchema.optional(),
   endDate: isoDateSchema.optional(),
@@ -96,6 +124,8 @@ export const updateProjectBodySchema = z
     address: z.string().trim().max(PROJECT_ADDRESS_MAX).nullish(),
     clientName: z.string().trim().max(PROJECT_CLIENT_NAME_MAX).nullish(),
     clientPhone: z.string().trim().max(PROJECT_CLIENT_PHONE_MAX).nullish(),
+    clientInn: clientInnInputSchema,
+    clientAddress: z.string().trim().max(PROJECT_CLIENT_ADDRESS_MAX).nullish(),
     status: z.enum(PROJECT_STATUSES).optional(),
     startDate: isoDateSchema.optional(),
     endDate: isoDateSchema.optional(),

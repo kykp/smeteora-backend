@@ -19,6 +19,10 @@ export const projects = pgTable(
     address: text('address'),
     clientName: text('client_name'),
     clientPhone: text('client_phone'),
+    // Реквизиты заказчика для подстановки в PDF-смету. ИНН — text (10/12 цифр,
+    // ведущие нули), формат валидируется на уровне zod-схемы в @smeteora/shared.
+    clientInn: text('client_inn'),
+    clientAddress: text('client_address'),
     status: text('status', { enum: PROJECT_STATUSES }).notNull().default('draft'),
     startDate: date('start_date'),
     endDate: date('end_date'),
