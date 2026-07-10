@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, integer, index } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // companies — тенант. Реквизиты (inn/kpp/ogrn/…) заполняются постепенно,
@@ -39,6 +39,9 @@ export const companies = pgTable(
     pdfShowAddresses: boolean('pdf_show_addresses').notNull().default(true),
     pdfShowBank: boolean('pdf_show_bank').notNull().default(true),
     pdfShowDirector: boolean('pdf_show_director').notNull().default(true),
+    // Срок действия КП в календарных днях. null = не показывать в PDF.
+    // На PDF рендерится как «Цены действительны до DD.MM.YYYY» (сегодня + N).
+    pdfOfferValidityDays: integer('pdf_offer_validity_days'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

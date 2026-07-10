@@ -50,6 +50,9 @@ export const companyResponseSchema = z.object({
   pdfShowAddresses: z.boolean(),
   pdfShowBank: z.boolean(),
   pdfShowDirector: z.boolean(),
+  // Срок действия КП в календарных днях. null = не показывать блок «Цены
+  // действительны до …» в PDF. Ограничение 1..365 отсекает случайные значения.
+  pdfOfferValidityDays: z.number().int().min(1).max(365).nullable(),
 });
 export type CompanyResponse = z.infer<typeof companyResponseSchema>;
 
@@ -98,6 +101,7 @@ export const patchCompanyBodySchema = z
     pdfShowAddresses: z.boolean().optional(),
     pdfShowBank: z.boolean().optional(),
     pdfShowDirector: z.boolean().optional(),
+    pdfOfferValidityDays: z.number().int().min(1).max(365).nullish(),
     directorName: nonEmptyTrimmed(DIRECTOR_NAME_MAX).nullish(),
     directorPosition: nonEmptyTrimmed(DIRECTOR_POSITION_MAX).nullish(),
     phone: nonEmptyTrimmed(PHONE_MAX).nullish(),

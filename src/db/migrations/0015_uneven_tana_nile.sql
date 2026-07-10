@@ -1,0 +1,1 @@
+ALTER TABLE "companies" ADD COLUMN "pdf_offer_validity_days" integer;
