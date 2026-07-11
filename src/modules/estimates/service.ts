@@ -107,6 +107,7 @@ const buildListItem = async (
   tx: Db,
   ctx: { companyId: string },
   est: Estimate,
+  projectStatus: EstimateListItem['projectStatus'],
 ): Promise<EstimateListItem> => {
   const items = await repo.listLineItemsByEstimate(tx, {
     estimateId: est.id,
@@ -130,7 +131,7 @@ const buildListItem = async (
     },
     lineOutputs,
   );
-  return { ...estimateToHeader(est), totals };
+  return { ...estimateToHeader(est), totals, projectStatus };
 };
 
 export const list = async (
@@ -142,11 +143,30 @@ export const list = async (
     companyId: ctx.companyId,
     projectId: query.projectId,
     status: query.status,
+    projectStatus: query.projectStatus,
+    q: query.q,
     sort: query.sort,
     limit: query.limit,
     offset: query.offset,
   });
-  const enriched = await Promise.all(items.map((e) => buildListItem(tx, ctx, e)));
+
+  // Тянем статусы проектов одним запросом — иначе фронт делает /projects
+  // отдельно и получает N+1 (или лимит по limit=200 может отсечь нужный
+  // проект, как это уже случилось у одной сметы).
+  const projectIds = Array.from(new Set(items.map((e) => e.projectId)));
+  const projectStatusRows =
+    projectIds.length > 0
+      ? await tx
+          .select({ id: projects.id, status: projects.status })
+          .from(projects)
+          .where(inArray(projects.id, projectIds))
+      : [];
+  const projectStatusById = new Map<string, EstimateListItem['projectStatus']>();
+  for (const p of projectStatusRows) projectStatusById.set(p.id, p.status);
+
+  const enriched = await Promise.all(
+    items.map((e) => buildListItem(tx, ctx, e, projectStatusById.get(e.projectId) ?? 'draft')),
+  );
   return { items: enriched, total, limit: query.limit, offset: query.offset };
 };
 
@@ -601,6 +621,112 @@ export const softDelete = async (
     entityType: 'estimate',
     entityId: id,
   });
+};
+
+// ── Duplicate ──────────────────────────────────────────────────
+// Полная копия сметы: наследует состав (разделы + строки со snapshot'ами)
+// и настройки шапки (валюта, НДС, скидки, режим, налог, notes, meta).
+// Сбрасывает: number (пусть юзер задаст сам), status → 'draft', version → 1,
+// createdAt/updatedAt → now, createdBy → текущий membership.
+// Атомарно в одной транзакции — либо целиком, либо ничего.
+
+export const duplicate = async (
+  tx: Db,
+  ctx: { companyId: string; membershipId: string; userId: string; sessionId: string },
+  sourceId: string,
+): Promise<EstimateTreeResponse> => {
+  const src = await repo.findEstimateById(tx, { id: sourceId, companyId: ctx.companyId });
+  if (!src) throw new NotFoundError('Смета не найдена');
+
+  const newTitle = `${src.title} (копия)`;
+  const newEst = await repo.insertEstimate(tx, {
+    companyId: ctx.companyId,
+    projectId: src.projectId,
+    number: null,
+    title: newTitle,
+    currency: src.currency,
+    vatMode: src.vatMode,
+    vatRate: src.vatRate,
+    discountPercent: src.discountPercent,
+    discountAmount: src.discountAmount,
+    mode: src.mode,
+    notes: src.notes,
+    meta: asMeta(src.meta),
+    createdBy: ctx.membershipId,
+  });
+
+  // Смета только что создана — insertEstimate уже засеял три канонических
+  // раздела (Оборудование/Монтаж/Другое). Смапим их id со срочными по title,
+  // строки перепривяжем на новые id разделов, чтобы дерево осталось цельным.
+  const [srcSections, srcItems, newSections] = await Promise.all([
+    repo.listSectionsByEstimate(tx, { estimateId: src.id, companyId: ctx.companyId }),
+    repo.listLineItemsByEstimate(tx, { estimateId: src.id, companyId: ctx.companyId }),
+    repo.listSectionsByEstimate(tx, { estimateId: newEst.id, companyId: ctx.companyId }),
+  ]);
+
+  // Сохраняем настройки разделов (default_margin_percent, default_discount_percent,
+  // sortOrder, meta) — копируем в новые по мэтчу title.
+  const newByTitle = new Map(newSections.map((s) => [s.title, s]));
+  const sectionIdMap = new Map<string, string>();
+  for (const s of srcSections) {
+    const matched = newByTitle.get(s.title);
+    if (!matched) continue;
+    sectionIdMap.set(s.id, matched.id);
+    await repo.updateSection(tx, {
+      id: matched.id,
+      estimateId: newEst.id,
+      companyId: ctx.companyId,
+      patch: {
+        defaultMarginPercent: s.defaultMarginPercent ?? null,
+        defaultDiscountPercent: s.defaultDiscountPercent ?? null,
+        sortOrder: s.sortOrder,
+        meta: asMeta(s.meta),
+      },
+    });
+  }
+
+  // Строки: новый id (генерирует БД), sectionId → новый через sectionIdMap,
+  // остальное — как в оригинале. productId сохраняем — это позволит
+  // find-existing-line работать на копии так же, как на оригинале.
+  if (srcItems.length > 0) {
+    await repo.upsertLineItems(
+      tx,
+      srcItems.map((li) => ({
+        id: crypto.randomUUID(),
+        companyId: ctx.companyId,
+        estimateId: newEst.id,
+        sectionId: li.sectionId ? (sectionIdMap.get(li.sectionId) ?? null) : null,
+        productId: li.productId,
+        catalogSnapshot: li.catalogSnapshot as Record<string, unknown> | null,
+        kind: li.kind,
+        name: li.name,
+        unit: li.unit,
+        quantity: li.quantity,
+        price: li.price,
+        cost: li.cost,
+        discountPercent: li.discountPercent,
+        vatRateOverride: li.vatRateOverride,
+        customMarginPercent: li.customMarginPercent,
+        customDiscountPercent: li.customDiscountPercent,
+        priceBasis: li.priceBasis,
+        expenseCategory: li.expenseCategory,
+        sortOrder: li.sortOrder,
+        meta: asMeta(li.meta),
+      })),
+    );
+  }
+
+  await writeAudit(tx, {
+    companyId: ctx.companyId,
+    userId: ctx.userId,
+    sessionId: ctx.sessionId,
+    action: 'estimate.duplicate',
+    entityType: 'estimate',
+    entityId: newEst.id,
+    meta: { sourceId },
+  });
+
+  return getTree(tx, ctx, newEst.id);
 };
 
 // ── Archive / unarchive ────────────────────────────────────────

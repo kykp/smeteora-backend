@@ -192,6 +192,29 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
+  // ── POST /estimates/:id/duplicate ───────────────────────────────
+  // Полная копия сметы с текущими настройками и составом. Новая смета —
+  // всегда draft, version=1. Возвращает свежее дерево копии, чтобы фронт
+  // сразу перешёл на её id без второго запроса.
+  app.post(
+    '/:id/duplicate',
+    {
+      schema: {
+        params: estimateIdParamSchema,
+        response: { 201: estimateTreeResponseSchema },
+        tags: ['estimates'],
+      },
+      onRequest: [app.authenticate, requireRole('member'), app.withCompanyContext],
+    },
+    async (request, reply) => {
+      const ctx = assertCtx(request.ctx);
+      const tx = assertTx(request.tx);
+      const copy = await service.duplicate(tx, ctx, request.params.id);
+      void reply.status(201);
+      return copy;
+    },
+  );
+
   // ── POST /estimates/:id/line-items ─────────────────────────────
   // Атомарное добавление одной строки. Заголовки:
   //   If-Match:         текущая version сметы (для optimistic concurrency)

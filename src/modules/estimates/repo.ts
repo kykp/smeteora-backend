@@ -4,6 +4,7 @@ import {
   estimates,
   estimateSections,
   estimateLineItems,
+  projects,
   type Estimate,
   type EstimateSection,
   type EstimateLineItem,
@@ -59,10 +60,16 @@ type ListParams = {
   companyId: string;
   projectId?: string | undefined;
   status?: EstimateStatus | undefined;
+  projectStatus?: string | undefined;
+  q?: string | undefined;
   sort: EstimateSortOption;
   limit: number;
   offset: number;
 };
+
+// ILIKE-паттерн по title. escape только %, _, обратный слеш — чтобы юзер
+// не мог случайно триггернуть wildcard-поиск, вводя обычные символы.
+const escapeLike = (s: string): string => s.replace(/[\\%_]/g, '\\$&');
 
 // Тайбрейкер id: если два ряда имеют одинаковое updatedAt/createdAt/title —
 // порядок стабильный между страницами, иначе offset-пагинация может дать
@@ -94,20 +101,68 @@ export const listByCompany = async (
     isNull(estimates.deletedAt),
     ...(params.projectId !== undefined ? [eq(estimates.projectId, params.projectId)] : []),
     ...(params.status !== undefined ? [eq(estimates.status, params.status)] : []),
+    ...(params.q !== undefined && params.q.length > 0
+      ? [sql`${estimates.title} ILIKE ${'%' + escapeLike(params.q) + '%'}`]
+      : []),
   ];
 
-  const items = await tx
-    .select()
-    .from(estimates)
-    .where(and(...conditions))
-    .orderBy(...buildOrderBy(params.sort))
-    .limit(params.limit)
-    .offset(params.offset);
+  // projectStatus фильтр — джойним projects. Без джойна используем прямой
+  // SELECT, чтобы не тащить типы. Если фильтр не задан — работает как раньше.
+  const query = tx
+    .select({
+      // берём только колонки estimates: остальные поля Estimate типа не
+      // требуют, а join делаем только ради WHERE.
+      id: estimates.id,
+      companyId: estimates.companyId,
+      projectId: estimates.projectId,
+      number: estimates.number,
+      title: estimates.title,
+      currency: estimates.currency,
+      vatMode: estimates.vatMode,
+      vatRate: estimates.vatRate,
+      discountPercent: estimates.discountPercent,
+      discountAmount: estimates.discountAmount,
+      status: estimates.status,
+      mode: estimates.mode,
+      taxRegime: estimates.taxRegime,
+      taxRate: estimates.taxRate,
+      taxBaseKind: estimates.taxBaseKind,
+      notes: estimates.notes,
+      meta: estimates.meta,
+      version: estimates.version,
+      createdBy: estimates.createdBy,
+      createdAt: estimates.createdAt,
+      updatedAt: estimates.updatedAt,
+      deletedAt: estimates.deletedAt,
+    })
+    .from(estimates);
 
-  const [countRow] = await tx
-    .select({ value: count() })
-    .from(estimates)
-    .where(and(...conditions));
+  const finalConditions =
+    params.projectStatus !== undefined
+      ? [...conditions, sql`${projects.status} = ${params.projectStatus}`]
+      : conditions;
+
+  const items =
+    params.projectStatus !== undefined
+      ? await query
+          .innerJoin(projects, eq(estimates.projectId, projects.id))
+          .where(and(...finalConditions))
+          .orderBy(...buildOrderBy(params.sort))
+          .limit(params.limit)
+          .offset(params.offset)
+      : await query
+          .where(and(...conditions))
+          .orderBy(...buildOrderBy(params.sort))
+          .limit(params.limit)
+          .offset(params.offset);
+
+  const countBase = tx.select({ value: count() }).from(estimates);
+  const [countRow] =
+    params.projectStatus !== undefined
+      ? await countBase
+          .innerJoin(projects, eq(estimates.projectId, projects.id))
+          .where(and(...finalConditions))
+      : await countBase.where(and(...conditions));
 
   return { items, total: countRow?.value ?? 0 };
 };

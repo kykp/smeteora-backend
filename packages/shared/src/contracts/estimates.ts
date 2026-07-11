@@ -234,8 +234,14 @@ export type EstimateTreeResponse = z.infer<typeof estimateTreeResponseSchema>;
 // ── List ─────────────────────────────────────────────────────────
 // Список смет — только шапка + итог, без дерева. Дерево — по GET /:id.
 
+// Статус проекта, к которому смета привязана, — это то что юзер видит и
+// меняет в шапке проекта. В списке смет показываем именно его, чтобы не
+// таскать отдельным запросом /projects список по всем project_id.
+const projectStatusInList = z.enum(['draft', 'in-progress', 'review', 'sent', 'won', 'lost']);
+
 export const estimateListItemSchema = estimateHeaderSchema.extend({
   totals: estimateTotalsSchema,
+  projectStatus: projectStatusInList,
 });
 export type EstimateListItem = z.infer<typeof estimateListItemSchema>;
 
@@ -255,6 +261,12 @@ export type EstimateSortOption = (typeof ESTIMATE_SORT_OPTIONS)[number];
 export const listEstimatesQuerySchema = z.object({
   projectId: uuidSchema.optional(),
   status: z.enum(ESTIMATE_STATUSES).optional(),
+  // Статус связанного проекта — то, что юзер реально видит и фильтрует
+  // в UI. Смёты никак не менее связаны со своими проектами, поэтому
+  // фильтровать «показать все смёты по выигранным проектам» — валидный
+  // юзкейс.
+  projectStatus: z.enum(['draft', 'in-progress', 'review', 'sent', 'won', 'lost']).optional(),
+  q: z.string().trim().min(1).max(200).optional(),
   sort: z.enum(ESTIMATE_SORT_OPTIONS).default('updatedAt.desc'),
   limit: z.coerce
     .number()
