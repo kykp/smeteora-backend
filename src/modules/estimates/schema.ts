@@ -3,6 +3,10 @@
 
 export {
   ESTIMATE_STATUSES,
+  ESTIMATE_MODES,
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_LABELS,
+  PRICE_BASES,
   VAT_MODES,
   LINE_ITEM_KINDS,
   estimateHeaderSchema,
@@ -18,6 +22,14 @@ export {
   createEstimateBodySchema,
   updateEstimateBodySchema,
   upsertTreeBodySchema,
+  createLineItemBodySchema,
+  updateLineItemBodySchema,
+  lineItemIdParamSchema,
+  lineItemMutationResponseSchema,
+  createSectionBodySchema,
+  updateSectionBodySchema,
+  sectionIdParamSchema,
+  sectionMutationResponseSchema,
   estimateIdParamSchema,
   estimateDeleteResponseSchema,
   ESTIMATES_BASE_PATH,
@@ -25,6 +37,9 @@ export {
 
 export type {
   EstimateStatus,
+  EstimateMode,
+  ExpenseCategory,
+  PriceBasis,
   VatMode,
   LineItemKind,
   EstimateHeader,
@@ -43,4 +58,8 @@ export type {
   TreeSectionInput,
   TreeLineItemInput,
   TreeHeaderPatch,
+  CreateLineItemBody,
+  UpdateLineItemBody,
+  CreateSectionBody,
+  UpdateSectionBody,
 } from '@smeteora/shared';

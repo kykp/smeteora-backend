@@ -3,6 +3,7 @@ import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { ConflictError, NotFoundError, UnauthorizedError } from '../../lib/errors.js';
 import { runWithoutCompanyContext } from '../../plugins/with-company-context.js';
 import * as repo from './repo.js';
+import * as worksService from '../works/service.js';
 import { type AuthUserResponse } from './schema.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -72,6 +73,7 @@ export const register = async (
       companyId: company.id,
       role: 'owner',
     });
+    await worksService.seedDefaultWorkItems(tx, company.id);
 
     const expiresAt = new Date(Date.now() + params.sessionTtlDays * DAY_MS);
     const sessionId = await repo.insertSession(tx, {

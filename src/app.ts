@@ -22,6 +22,7 @@ import { invitationsRoutes } from './modules/invitations/routes.js';
 import { estimatesRoutes } from './modules/estimates/routes.js';
 import { companyRoutes } from './modules/company/routes.js';
 import { productsRoutes, categoriesRoutes, unitsRoutes } from './modules/catalog/routes.js';
+import { workItemsRoutes, workCategoriesRoutes } from './modules/works/routes.js';
 import { priceListsRoutes } from './modules/price-lists/routes.js';
 
 // Опциональные оверрайды для тестов — подменить внешние клиенты (Яндекс и т.п.)
@@ -159,6 +160,8 @@ export const buildApp = async (
       await v1.register(productsRoutes, { prefix: '/products' });
       await v1.register(categoriesRoutes, { prefix: '/categories' });
       await v1.register(unitsRoutes, { prefix: '/units' });
+      await v1.register(workItemsRoutes, { prefix: '/work-items' });
+      await v1.register(workCategoriesRoutes, { prefix: '/work-categories' });
       await v1.register(priceListsRoutes, { prefix: '/price-lists' });
     },
     { prefix: API_V1_PREFIX },

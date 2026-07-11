@@ -47,7 +47,13 @@ describe('estimates — CRUD (happy path)', () => {
     expect(body.estimate.currency).toBe('RUB');
     expect(body.estimate.vatMode).toBe('none');
     expect(body.totals.total).toBe('0.00');
-    expect(body.sections).toEqual([]);
+    // Новая смета всегда содержит 3 канонических раздела: «Оборудование»,
+    // «Монтаж», «Другое». Порядок фиксирован sortOrder.
+    expect(body.sections.map((s: { title: string }) => s.title)).toEqual([
+      'Оборудование',
+      'Монтаж',
+      'Другое',
+    ]);
     expect(body.lineItems).toEqual([]);
   });
 
@@ -139,7 +145,11 @@ describe('estimates — CRUD (happy path)', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().estimate.id).toBe(est.id);
-    expect(res.json().sections).toEqual([]);
+    expect(res.json().sections.map((s: { title: string }) => s.title)).toEqual([
+      'Оборудование',
+      'Монтаж',
+      'Другое',
+    ]);
     expect(res.json().lineItems).toEqual([]);
   });
 

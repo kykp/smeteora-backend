@@ -8,6 +8,7 @@ import { type EmailSender } from '../../lib/email/sender.js';
 import { buildAuthResponse } from './service.js';
 import { type AuthUserResponse } from './schema.js';
 import * as repo from './repo.js';
+import * as worksService from '../works/service.js';
 
 // Пороги защиты. Держим низкими, чтобы юзер не мог случайно засыпать почту
 // спамом при повторных запросах, и злоумышленник не мог enumerate'ить адреса.
@@ -172,6 +173,7 @@ export const verifyEmailOtp = async (db: Db, input: VerifyInput): Promise<Verify
         companyId: company.id,
         role: 'owner',
       });
+      await worksService.seedDefaultWorkItems(tx, company.id);
       userId = user.id;
     }
 

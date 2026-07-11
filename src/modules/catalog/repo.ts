@@ -153,10 +153,21 @@ type ListProductsParams = {
   offset: number;
 };
 
-// Полнотекстовый поиск через to_tsvector — тот же индекс что и в миграции.
-// plainto_tsquery терпимо парсит юзер-строку («камера hikvision») в query.
-const fullTextMatch = (q: string): SQL =>
-  sql`to_tsvector('russian', coalesce(${products.name}, '') || ' ' || coalesce(${products.sku}, '') || ' ' || coalesce(${products.brand}, '')) @@ plainto_tsquery('russian', ${q})`;
+// Substring-поиск по name/sku/brand через ILIKE. Раньше был полнотекстовый
+// to_tsvector/plainto_tsquery — он ищет лексемы целиком, поэтому префикс
+// «ку» не находил «купольная камера». В редакторе-каталоге юзер печатает
+// символы и ждёт результат на каждом нажатии, поэтому нужен substring.
+// На больших каталогах когда упрёмся в скорость — добавим pg_trgm индексы.
+const escapeLike = (s: string): string => s.replace(/[\\%_]/g, '\\$&');
+
+const fullTextMatch = (q: string): SQL => {
+  const pattern = `%${escapeLike(q)}%`;
+  return sql`(
+    ${products.name} ILIKE ${pattern}
+    OR coalesce(${products.sku}, '') ILIKE ${pattern}
+    OR coalesce(${products.brand}, '') ILIKE ${pattern}
+  )`;
+};
 
 const buildProductConditions = (params: ListProductsParams): SQL[] => {
   const conditions: SQL[] = [isNull(products.deletedAt)];

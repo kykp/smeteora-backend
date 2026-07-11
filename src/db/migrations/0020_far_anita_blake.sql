@@ -1,0 +1,1 @@
+ALTER TABLE "estimates" ADD COLUMN "mode" text DEFAULT 'simple' NOT NULL;

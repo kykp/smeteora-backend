@@ -3,15 +3,25 @@ import { requireRole } from '../../plugins/require-role.js';
 import { UnauthorizedError } from '../../lib/errors.js';
 import { type Db } from '../../db/client.js';
 import { type AuthContext } from '../../plugins/auth.js';
+import { withIdempotency } from '../../lib/idempotency.js';
+import { parseIfMatch } from '../../lib/optimistic-concurrency.js';
 import * as service from './service.js';
 import {
   createEstimateBodySchema,
+  createLineItemBodySchema,
+  createSectionBodySchema,
   estimateDeleteResponseSchema,
   estimateIdParamSchema,
   estimateTreeResponseSchema,
+  lineItemIdParamSchema,
+  lineItemMutationResponseSchema,
   listEstimatesQuerySchema,
   listEstimatesResponseSchema,
+  sectionIdParamSchema,
+  sectionMutationResponseSchema,
   updateEstimateBodySchema,
+  updateLineItemBodySchema,
+  updateSectionBodySchema,
   upsertTreeBodySchema,
 } from './schema.js';
 
@@ -179,6 +189,205 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
       const tx = assertTx(request.tx);
       await service.softDelete(tx, ctx, request.params.id);
       return { ok: true as const };
+    },
+  );
+
+  // ── POST /estimates/:id/line-items ─────────────────────────────
+  // Атомарное добавление одной строки. Заголовки:
+  //   If-Match:         текущая version сметы (для optimistic concurrency)
+  //   Idempotency-Key:  uuid, защита от двойных кликов и сетевых ретраев
+  app.post(
+    '/:id/line-items',
+    {
+      schema: {
+        params: estimateIdParamSchema,
+        body: createLineItemBodySchema,
+        response: { 200: lineItemMutationResponseSchema },
+        tags: ['estimates'],
+      },
+      onRequest: [app.authenticate, requireRole('member'), app.withCompanyContext],
+    },
+    async (request) => {
+      const ctx = assertCtx(request.ctx);
+      const tx = assertTx(request.tx);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      const idempotencyKey = request.headers['idempotency-key'] as string | undefined;
+      return withIdempotency(
+        tx,
+        { companyId: ctx.companyId, userId: ctx.userId },
+        'POST',
+        `/estimates/${request.params.id}/line-items`,
+        idempotencyKey,
+        () => service.createLineItem(tx, ctx, request.params.id, expectedVersion, request.body),
+      );
+    },
+  );
+
+  // ── PATCH /estimates/:id/line-items/:lineId ────────────────────
+  app.patch(
+    '/:id/line-items/:lineId',
+    {
+      schema: {
+        params: lineItemIdParamSchema,
+        body: updateLineItemBodySchema,
+        response: { 200: lineItemMutationResponseSchema },
+        tags: ['estimates'],
+      },
+      onRequest: [app.authenticate, requireRole('member'), app.withCompanyContext],
+    },
+    async (request) => {
+      const ctx = assertCtx(request.ctx);
+      const tx = assertTx(request.tx);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      const idempotencyKey = request.headers['idempotency-key'] as string | undefined;
+      return withIdempotency(
+        tx,
+        { companyId: ctx.companyId, userId: ctx.userId },
+        'PATCH',
+        `/estimates/${request.params.id}/line-items/${request.params.lineId}`,
+        idempotencyKey,
+        () =>
+          service.updateLineItem(
+            tx,
+            ctx,
+            request.params.id,
+            request.params.lineId,
+            expectedVersion,
+            request.body,
+          ),
+      );
+    },
+  );
+
+  // ── POST /estimates/:id/sections ───────────────────────────────
+  app.post(
+    '/:id/sections',
+    {
+      schema: {
+        params: estimateIdParamSchema,
+        body: createSectionBodySchema,
+        response: { 200: sectionMutationResponseSchema },
+        tags: ['estimates'],
+      },
+      onRequest: [app.authenticate, requireRole('member'), app.withCompanyContext],
+    },
+    async (request) => {
+      const ctx = assertCtx(request.ctx);
+      const tx = assertTx(request.tx);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      const idempotencyKey = request.headers['idempotency-key'] as string | undefined;
+      return withIdempotency(
+        tx,
+        { companyId: ctx.companyId, userId: ctx.userId },
+        'POST',
+        `/estimates/${request.params.id}/sections`,
+        idempotencyKey,
+        () => service.createSection(tx, ctx, request.params.id, expectedVersion, request.body),
+      );
+    },
+  );
+
+  // ── PATCH /estimates/:id/sections/:sectionId ───────────────────
+  app.patch(
+    '/:id/sections/:sectionId',
+    {
+      schema: {
+        params: sectionIdParamSchema,
+        body: updateSectionBodySchema,
+        response: { 200: sectionMutationResponseSchema },
+        tags: ['estimates'],
+      },
+      onRequest: [app.authenticate, requireRole('member'), app.withCompanyContext],
+    },
+    async (request) => {
+      const ctx = assertCtx(request.ctx);
+      const tx = assertTx(request.tx);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      const idempotencyKey = request.headers['idempotency-key'] as string | undefined;
+      return withIdempotency(
+        tx,
+        { companyId: ctx.companyId, userId: ctx.userId },
+        'PATCH',
+        `/estimates/${request.params.id}/sections/${request.params.sectionId}`,
+        idempotencyKey,
+        () =>
+          service.updateSection(
+            tx,
+            ctx,
+            request.params.id,
+            request.params.sectionId,
+            expectedVersion,
+            request.body,
+          ),
+      );
+    },
+  );
+
+  // ── DELETE /estimates/:id/sections/:sectionId ──────────────────
+  app.delete(
+    '/:id/sections/:sectionId',
+    {
+      schema: {
+        params: sectionIdParamSchema,
+        response: { 200: sectionMutationResponseSchema },
+        tags: ['estimates'],
+      },
+      onRequest: [app.authenticate, requireRole('member'), app.withCompanyContext],
+    },
+    async (request) => {
+      const ctx = assertCtx(request.ctx);
+      const tx = assertTx(request.tx);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      const idempotencyKey = request.headers['idempotency-key'] as string | undefined;
+      return withIdempotency(
+        tx,
+        { companyId: ctx.companyId, userId: ctx.userId },
+        'DELETE',
+        `/estimates/${request.params.id}/sections/${request.params.sectionId}`,
+        idempotencyKey,
+        () =>
+          service.deleteSection(
+            tx,
+            ctx,
+            request.params.id,
+            request.params.sectionId,
+            expectedVersion,
+          ),
+      );
+    },
+  );
+
+  // ── DELETE /estimates/:id/line-items/:lineId ───────────────────
+  app.delete(
+    '/:id/line-items/:lineId',
+    {
+      schema: {
+        params: lineItemIdParamSchema,
+        response: { 200: lineItemMutationResponseSchema },
+        tags: ['estimates'],
+      },
+      onRequest: [app.authenticate, requireRole('member'), app.withCompanyContext],
+    },
+    async (request) => {
+      const ctx = assertCtx(request.ctx);
+      const tx = assertTx(request.tx);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      const idempotencyKey = request.headers['idempotency-key'] as string | undefined;
+      return withIdempotency(
+        tx,
+        { companyId: ctx.companyId, userId: ctx.userId },
+        'DELETE',
+        `/estimates/${request.params.id}/line-items/${request.params.lineId}`,
+        idempotencyKey,
+        () =>
+          service.deleteLineItem(
+            tx,
+            ctx,
+            request.params.id,
+            request.params.lineId,
+            expectedVersion,
+          ),
+      );
     },
   );
 };

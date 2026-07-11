@@ -1,4 +1,13 @@
-import { pgTable, uuid, text, timestamp, boolean, integer, index } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  boolean,
+  integer,
+  numeric,
+  index,
+} from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // companies — тенант. Реквизиты (inn/kpp/ogrn/…) заполняются постепенно,
@@ -39,9 +48,29 @@ export const companies = pgTable(
     pdfShowAddresses: boolean('pdf_show_addresses').notNull().default(true),
     pdfShowBank: boolean('pdf_show_bank').notNull().default(true),
     pdfShowDirector: boolean('pdf_show_director').notNull().default(true),
+    // Показывать колонку «Артикул» в таблице позиций PDF-сметы. По умолчанию
+    // выключено — для физлиц и коротких КП артикулы визуальный шум; юрлицам
+    // и техническим сметам полезны для сверки с их справочником.
+    pdfShowSku: boolean('pdf_show_sku').notNull().default(false),
     // Срок действия КП в календарных днях. null = не показывать в PDF.
     // На PDF рендерится как «Цены действительны до DD.MM.YYYY» (сегодня + N).
     pdfOfferValidityDays: integer('pdf_offer_validity_days'),
+
+    // Дефолтные наценки — применяются к автосозданным разделам новой сметы
+    // (см. estimateSections.defaultMarginPercent). Юзер может переопределить
+    // на конкретном разделе. null = наценку по умолчанию не применяем.
+    defaultEquipmentMarginPercent: numeric('default_equipment_margin_percent', {
+      precision: 6,
+      scale: 2,
+    }),
+    defaultInstallationMarginPercent: numeric('default_installation_margin_percent', {
+      precision: 6,
+      scale: 2,
+    }),
+    defaultOtherMarginPercent: numeric('default_other_margin_percent', {
+      precision: 6,
+      scale: 2,
+    }),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

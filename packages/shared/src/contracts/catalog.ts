@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { LINE_ITEM_KINDS } from './estimates.js';
+
 // Контракт /api/v1/catalog — товары, категории, единицы измерения.
 // Все три ресурса под одним префиксом чтобы не плодить top-level модули на фронте.
 
@@ -105,6 +107,9 @@ export const productSchema = z.object({
   description: z.string().max(PRODUCT_DESCRIPTION_MAX).nullable(),
   buyPrice: z.string().nullable(), // decimal-as-string
   sellPrice: z.string().nullable(),
+  // Тип позиции при добавлении в смету: material → раздел «Оборудование»,
+  // work → «Монтаж», service/other → «Другое». Задаётся при создании товара.
+  kind: z.enum(LINE_ITEM_KINDS),
   attributes: z.record(z.unknown()),
   isActive: z.boolean(),
   createdAt: z.string().datetime(),

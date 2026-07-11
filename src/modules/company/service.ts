@@ -33,7 +33,11 @@ const toResponse = (row: Company): CompanyResponse => ({
   pdfShowAddresses: row.pdfShowAddresses,
   pdfShowBank: row.pdfShowBank,
   pdfShowDirector: row.pdfShowDirector,
+  pdfShowSku: row.pdfShowSku,
   pdfOfferValidityDays: row.pdfOfferValidityDays,
+  defaultEquipmentMarginPercent: row.defaultEquipmentMarginPercent,
+  defaultInstallationMarginPercent: row.defaultInstallationMarginPercent,
+  defaultOtherMarginPercent: row.defaultOtherMarginPercent,
 });
 
 export const get = async (tx: Db, companyId: string): Promise<CompanyResponse> => {
@@ -83,7 +87,11 @@ export const update = async (
   assignNullable('pdfShowAddresses', body.pdfShowAddresses);
   assignNullable('pdfShowBank', body.pdfShowBank);
   assignNullable('pdfShowDirector', body.pdfShowDirector);
+  assignNullable('pdfShowSku', body.pdfShowSku);
   assignNullable('pdfOfferValidityDays', body.pdfOfferValidityDays);
+  assignNullable('defaultEquipmentMarginPercent', body.defaultEquipmentMarginPercent);
+  assignNullable('defaultInstallationMarginPercent', body.defaultInstallationMarginPercent);
+  assignNullable('defaultOtherMarginPercent', body.defaultOtherMarginPercent);
 
   const row = await repo.patch(tx, companyId, values);
   if (!row) throw new NotFoundError('Компания не найдена');

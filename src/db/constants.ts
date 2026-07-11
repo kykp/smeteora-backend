@@ -13,6 +13,13 @@ export const PROJECT_STATUSES = ['draft', 'in-progress', 'review', 'sent', 'won'
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
 export const ESTIMATE_STATUSES = ['draft', 'sent', 'approved', 'rejected', 'archived'] as const;
+
+// Режим редактирования сметы. simple — плоский список позиций с ручной ценой;
+// pro — разделы с наценкой (sellPrice = buyPrice × (1 + margin/100)).
+// Модель данных одна и та же; различаются только UI и стратегия автосоздания
+// разделов при create.
+export const ESTIMATE_MODES = ['simple', 'pro'] as const;
+export type EstimateMode = (typeof ESTIMATE_MODES)[number];
 export type EstimateStatus = (typeof ESTIMATE_STATUSES)[number];
 
 // Как трактовать цены позиций относительно НДС:
@@ -22,9 +29,34 @@ export type EstimateStatus = (typeof ESTIMATE_STATUSES)[number];
 export const VAT_MODES = ['none', 'included', 'added'] as const;
 export type VatMode = (typeof VAT_MODES)[number];
 
+// Налоговый режим сметы. Считается на клиенте по формуле:
+//   none         — без налога (0 ₽)
+//   npd          — самозанятый (НПД), 6% с продажи (юр.лица)
+//   usn_income   — УСН «Доходы» 6% с продажи
+//   usn_profit   — УСН «Доходы минус расходы» 15% с (валовая − opex), если >0
+//   osno         — ОСНО 20% с (валовая − opex), если >0
+//   custom       — своя ставка + база (income / income_minus_expenses)
+export const TAX_REGIMES = ['none', 'npd', 'usn_income', 'usn_profit', 'osno', 'custom'] as const;
+export type TaxRegime = (typeof TAX_REGIMES)[number];
+
+// База налога — только для custom. Для стандартных режимов вычисляется на
+// клиенте по TAX_REGIMES выше.
+export const TAX_BASE_KINDS = ['income', 'income_minus_expenses'] as const;
+export type TaxBaseKind = (typeof TAX_BASE_KINDS)[number];
+
 // Тип позиции сметы. Разбивка "работы / материалы" — стандарт отчётности по сметам.
 export const LINE_ITEM_KINDS = ['work', 'material', 'service', 'other'] as const;
 export type LineItemKind = (typeof LINE_ITEM_KINDS)[number];
+
+// База расчёта цены на строке сметы. Определяет что означает процент строки:
+//   rrp    — от РРЦ поставщика: sell = catalog.sellPrice × (1 - discount/100).
+//            Юзер даёт скидку клиенту от рекомендованной цены.
+//   cost   — от закупки: sell = catalog.buyPrice × (1 + margin/100).
+//            Юзер сам считает наценку от себестоимости.
+//   manual — свободная цена: sell вводится вручную, процент игнорируется.
+//            Для kind='other' (расходы) и позиций без каталога.
+export const PRICE_BASES = ['rrp', 'cost', 'manual'] as const;
+export type PriceBasis = (typeof PRICE_BASES)[number];
 
 // OAuth-провайдеры, привязка к учётке. Наращивается по мере поддержки.
 export const IDENTITY_PROVIDERS = ['yandex'] as const;

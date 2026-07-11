@@ -1,0 +1,1 @@
+ALTER TABLE "estimate_line_items" ADD COLUMN "price_basis" text DEFAULT 'rrp' NOT NULL;

@@ -13,7 +13,7 @@ import { sql } from 'drizzle-orm';
 import { companies } from './companies.js';
 import { productCategories } from './product-categories.js';
 import { units } from './units.js';
-import { CATALOG_SOURCES } from '../constants.js';
+import { CATALOG_SOURCES, LINE_ITEM_KINDS } from '../constants.js';
 
 // Товары каталога. Nullable company_id — платформенные видны всем через RLS.
 // Цена numeric(14,4) как в line_items — сохраняем точность до сотых копейки,
@@ -44,6 +44,12 @@ export const products = pgTable(
     sku: text('sku'),
     brand: text('brand'),
     description: text('description'),
+    // Тип позиции при добавлении в смету: material (оборудование/материалы),
+    // work (монтаж/работы), service (услуги), other (прочие расходы).
+    // Значение копируется в line_item.kind при добавлении, юзер может
+    // переопределить в строке. Дефолт material — большинство товаров каталога
+    // это оборудование.
+    kind: text('kind', { enum: LINE_ITEM_KINDS }).notNull().default('material'),
 
     buyPrice: numeric('buy_price', { precision: 14, scale: 4 }),
     sellPrice: numeric('sell_price', { precision: 14, scale: 4 }),

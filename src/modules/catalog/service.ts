@@ -56,6 +56,7 @@ const toProductDto = (row: Product): ProductDto => ({
   description: row.description,
   buyPrice: row.buyPrice,
   sellPrice: row.sellPrice,
+  kind: row.kind,
   attributes: row.attributes as Record<string, unknown>,
   isActive: row.isActive,
   createdAt: row.createdAt.toISOString(),

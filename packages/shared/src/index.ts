@@ -6,4 +6,5 @@ export * from './contracts/projects.js';
 export * from './contracts/invitations.js';
 export * from './contracts/estimates.js';
 export * from './contracts/catalog.js';
+export * from './contracts/works.js';
 export * from './contracts/price-lists.js';

@@ -4,6 +4,7 @@ import { identities } from '../../db/schema/index.js';
 import { runWithoutCompanyContext } from '../../plugins/with-company-context.js';
 import { extractDisplayName, extractEmail, type YandexUserInfo } from './yandex-client.js';
 import * as repo from './repo.js';
+import * as worksService from '../works/service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -161,6 +162,7 @@ const createNewYandexUser = async (
     companyId: company.id,
     role: 'owner',
   });
+  await worksService.seedDefaultWorkItems(tx, company.id);
   await insertYandexIdentity(tx, {
     userId: user.id,
     providerUserId: params.providerUserId,

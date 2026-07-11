@@ -1,0 +1,1 @@
+ALTER TABLE "companies" ADD COLUMN "pdf_show_sku" boolean DEFAULT false NOT NULL;

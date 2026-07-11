@@ -15,7 +15,15 @@ import { sql } from 'drizzle-orm';
 import { companies } from './companies.js';
 import { projects } from './projects.js';
 import { memberships } from './memberships.js';
-import { ESTIMATE_STATUSES, LINE_ITEM_KINDS, VAT_MODES } from '../constants.js';
+import {
+  ESTIMATE_MODES,
+  ESTIMATE_STATUSES,
+  LINE_ITEM_KINDS,
+  PRICE_BASES,
+  TAX_BASE_KINDS,
+  TAX_REGIMES,
+  VAT_MODES,
+} from '../constants.js';
 
 // ── estimates (шапка сметы) ────────────────────────────────────────
 // Смета всегда принадлежит проекту, project_id NOT NULL. Через проект → компания;
@@ -48,10 +56,24 @@ export const estimates = pgTable(
     discountPercent: numeric('discount_percent', { precision: 5, scale: 2 }),
     discountAmount: numeric('discount_amount', { precision: 14, scale: 2 }),
     status: text('status', { enum: ESTIMATE_STATUSES }).notNull().default('draft'),
+    // Режим редактирования: simple — плоский список; pro — разделы с наценкой.
+    // Модель данных одна и та же, различается только UI. Дефолт 'simple' —
+    // новички работают с более понятным интерфейсом; кто хочет — переключит.
+    mode: text('mode', { enum: ESTIMATE_MODES }).notNull().default('simple'),
+    // Налоговый режим сметы. Считается на клиенте по стандартной формуле
+    // (см. constants.TAX_REGIMES). tax_rate/tax_base_kind нужны только для
+    // 'custom' — иначе игнорируются.
+    taxRegime: text('tax_regime', { enum: TAX_REGIMES }).notNull().default('none'),
+    taxRate: numeric('tax_rate', { precision: 5, scale: 2 }),
+    taxBaseKind: text('tax_base_kind', { enum: TAX_BASE_KINDS }),
     notes: text('notes'),
     meta: jsonb('meta')
       .notNull()
       .default(sql`'{}'::jsonb`),
+    // Optimistic concurrency: инкрементится на каждую мутацию (шапка, строка,
+    // раздел). Клиент шлёт If-Match с текущим значением, при расхождении
+    // сервис возвращает 409. Без этого двое юзеров затирают правки друг друга.
+    version: integer('version').notNull().default(1),
     createdBy: uuid('created_by').references(() => memberships.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -88,6 +110,14 @@ export const estimateSections = pgTable(
     }),
     title: text('title').notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
+    // Наценка раздела в процентах. При добавлении позиции в раздел
+    // sellPrice = buyPrice × (1 + margin/100). null = наценка не применяется
+    // автоматом; юзер должен вводить цену явно. Диапазон 0..1000%.
+    defaultMarginPercent: numeric('default_margin_percent', { precision: 6, scale: 2 }),
+    // Скидка раздела в процентах (для simple-режима). Применяется ко всем
+    // строкам раздела у которых custom_discount_percent IS NULL — при
+    // изменении бэк пересчитывает их цены. Диапазон 0..100%.
+    defaultDiscountPercent: numeric('default_discount_percent', { precision: 5, scale: 2 }),
     meta: jsonb('meta')
       .notNull()
       .default(sql`'{}'::jsonb`),
@@ -126,8 +156,31 @@ export const estimateLineItems = pgTable(
     unit: text('unit').notNull(),
     quantity: numeric('quantity', { precision: 14, scale: 4 }).notNull(),
     price: numeric('price', { precision: 14, scale: 4 }).notNull(),
+    // Себестоимость единицы. Используется калькулятором рентабельности.
+    // Для товаров/работ из каталога дублирует snapshot.buyPrice/cost и
+    // юзер её обычно не трогает. Для manual (раздел «Другое») юзер задаёт
+    // руками — иначе не отличить транзитную командировку от наценки.
+    // 0 = «расход клиенту 1:1» (маржи нет).
+    cost: numeric('cost', { precision: 14, scale: 4 }).notNull().default('0'),
     discountPercent: numeric('discount_percent', { precision: 5, scale: 2 }).notNull().default('0'),
     vatRateOverride: numeric('vat_rate_override', { precision: 5, scale: 2 }),
+    // Override наценки на этой строке. Используется когда price_basis='cost'.
+    // null = наследуется от раздела (estimate_sections.default_margin_percent).
+    customMarginPercent: numeric('custom_margin_percent', { precision: 6, scale: 2 }),
+    // Override скидки на этой строке (simple-режим). null = наследует от
+    // раздела (estimate_sections.default_discount_percent). При изменении
+    // скидки раздела строки с override своё значение сохраняют.
+    customDiscountPercent: numeric('custom_discount_percent', { precision: 5, scale: 2 }),
+    // База расчёта цены. Определяет как считается price:
+    //   rrp    → price = snapshot.sellPrice × (1 - discountPercent/100)
+    //   cost   → price = snapshot.buyPrice × (1 + effectiveMargin/100)
+    //   manual → price вводится вручную, ни discount ни margin не применяются.
+    priceBasis: text('price_basis', { enum: PRICE_BASES }).notNull().default('rrp'),
+    // Категория расхода для позиций kind='other' (транспорт, проектирование,
+    // командировочные). Используется в разделе «Другое» и в аналитике —
+    // группировка «сколько ушло на транспорт за квартал». Свободный text,
+    // валидность значения проверяет клиент по списку EXPENSE_CATEGORIES.
+    expenseCategory: text('expense_category'),
     sortOrder: integer('sort_order').notNull().default(0),
     meta: jsonb('meta')
       .notNull()

@@ -50,9 +50,15 @@ export const companyResponseSchema = z.object({
   pdfShowAddresses: z.boolean(),
   pdfShowBank: z.boolean(),
   pdfShowDirector: z.boolean(),
+  pdfShowSku: z.boolean(),
   // Срок действия КП в календарных днях. null = не показывать блок «Цены
   // действительны до …» в PDF. Ограничение 1..365 отсекает случайные значения.
   pdfOfferValidityDays: z.number().int().min(1).max(365).nullable(),
+  // Дефолтные наценки (в процентах) для автосоздаваемых разделов новой сметы.
+  // Хранятся как decimal-строка ("20.00"). null = наценку не применять автоматом.
+  defaultEquipmentMarginPercent: z.string().nullable(),
+  defaultInstallationMarginPercent: z.string().nullable(),
+  defaultOtherMarginPercent: z.string().nullable(),
 });
 export type CompanyResponse = z.infer<typeof companyResponseSchema>;
 
@@ -101,7 +107,25 @@ export const patchCompanyBodySchema = z
     pdfShowAddresses: z.boolean().optional(),
     pdfShowBank: z.boolean().optional(),
     pdfShowDirector: z.boolean().optional(),
+    pdfShowSku: z.boolean().optional(),
     pdfOfferValidityDays: z.number().int().min(1).max(365).nullish(),
+    // Наценка передаётся decimal-строкой ("20" или "20.00") или null для сброса.
+    // Диапазон 0..1000 — как в estimate_sections.default_margin_percent.
+    defaultEquipmentMarginPercent: z
+      .string()
+      .regex(/^\d+(\.\d{1,2})?$/, 'Наценка: число с точкой')
+      .refine((v) => Number(v) >= 0 && Number(v) <= 1000, 'Наценка должна быть 0..1000')
+      .nullish(),
+    defaultInstallationMarginPercent: z
+      .string()
+      .regex(/^\d+(\.\d{1,2})?$/, 'Наценка: число с точкой')
+      .refine((v) => Number(v) >= 0 && Number(v) <= 1000, 'Наценка должна быть 0..1000')
+      .nullish(),
+    defaultOtherMarginPercent: z
+      .string()
+      .regex(/^\d+(\.\d{1,2})?$/, 'Наценка: число с точкой')
+      .refine((v) => Number(v) >= 0 && Number(v) <= 1000, 'Наценка должна быть 0..1000')
+      .nullish(),
     directorName: nonEmptyTrimmed(DIRECTOR_NAME_MAX).nullish(),
     directorPosition: nonEmptyTrimmed(DIRECTOR_POSITION_MAX).nullish(),
     phone: nonEmptyTrimmed(PHONE_MAX).nullish(),

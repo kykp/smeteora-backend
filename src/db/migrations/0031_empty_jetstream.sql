@@ -1,0 +1,1 @@
+ALTER TABLE "estimate_line_items" ADD COLUMN "cost" numeric(14, 4) DEFAULT '0' NOT NULL;
