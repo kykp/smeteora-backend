@@ -90,6 +90,10 @@ export const workItemSchema = z.object({
   triggerCategoryIds: z.array(uuidSchema),
   meta: z.record(z.unknown()),
   isActive: z.boolean(),
+  // В скольких сметах компании работа когда-либо встречалась (COUNT DISTINCT
+  // estimate_id через catalog_snapshot.workItemId). Фронт использует для
+  // сортировки и бейджика «Часто». 0 для платформенных работ и без использования.
+  usageCount: z.number().int().min(0).default(0),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -112,6 +116,10 @@ export const listWorkItemsQuerySchema = z.object({
     .max(WORK_ITEM_LIST_MAX_LIMIT)
     .default(WORK_ITEM_LIST_DEFAULT_LIMIT),
   offset: z.coerce.number().int().min(0).default(0),
+  // 'name' — алфавитная сортировка (default). 'popularity' — по usageCount
+  // DESC, потом по имени. Для боковой панели редактора: часто применяемые
+  // работы всплывают сверху.
+  sortBy: z.enum(['name', 'popularity']).default('name'),
 });
 export type ListWorkItemsQuery = z.infer<typeof listWorkItemsQuerySchema>;
 

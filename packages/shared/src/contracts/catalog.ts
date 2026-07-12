@@ -112,6 +112,10 @@ export const productSchema = z.object({
   kind: z.enum(LINE_ITEM_KINDS),
   attributes: z.record(z.unknown()),
   isActive: z.boolean(),
+  // В скольких сметах компании товар когда-либо встречался (COUNT DISTINCT
+  // estimate_id). Фронт использует для сортировки и бейджика «Часто».
+  // 0 для платформенных товаров и товаров без использования.
+  usageCount: z.number().int().min(0).default(0),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -145,6 +149,10 @@ export const listProductsQuerySchema = z.object({
     .max(PRODUCT_LIST_MAX_LIMIT)
     .default(PRODUCT_LIST_DEFAULT_LIMIT),
   offset: z.coerce.number().int().min(0).default(0),
+  // 'name' (default) — алфавитная сортировка, для страницы /catalog.
+  // 'popularity' — по usageCount DESC, потом по имени. Для боковой панели
+  // в редакторе сметы: часто добавляемые товары всплывают сверху.
+  sortBy: z.enum(['name', 'popularity']).default('name'),
 });
 export type ListProductsQuery = z.infer<typeof listProductsQuerySchema>;
 

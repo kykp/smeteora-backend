@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { type Db } from '../../db/client.js';
 import {
   workItems,
@@ -121,7 +121,13 @@ type ListWorkItemsParams = {
   isActive?: boolean | undefined;
   limit: number;
   offset: number;
+  // 'name' — алфавитная сортировка (default). 'popularity' — по usageCount
+  // DESC, потом по имени. Для боковой панели редактора: часто применяемые
+  // работы всплывают сверху.
+  sortBy?: 'name' | 'popularity' | undefined;
 };
+
+export type WorkItemWithUsage = WorkItem & { usageCount: number };
 
 const escapeLike = (s: string): string => s.replace(/[\\%_]/g, '\\$&');
 
@@ -162,13 +168,33 @@ const buildConditions = (params: ListWorkItemsParams): SQL[] => {
 export const listItems = async (
   tx: Db,
   params: ListWorkItemsParams,
-): Promise<{ items: WorkItem[]; total: number }> => {
+): Promise<{ items: WorkItemWithUsage[]; total: number }> => {
   const conditions = buildConditions(params);
-  const items = await tx
-    .select()
+
+  // usage_count = в скольких сметах компании работа когда-либо встречалась.
+  // Работы не хранят product_id (у line_items он null), match делаем по
+  // catalog_snapshot->>'workItemId'. Приведение к uuid безопасно: если ключа
+  // нет в snapshot, jsonb ->> вернёт NULL, а NULL::uuid = NULL, значит
+  // условие не сматчит и count останется корректным.
+  // Явные имена столбцов (не через drizzle-заглушки) — корреляция с внешним
+  // work_items работает надёжно, иначе subquery получал алиас и всегда 0.
+  const usageCountExpr = sql<number>`(
+    SELECT COUNT(DISTINCT estimate_line_items.estimate_id)::int
+    FROM estimate_line_items
+    WHERE (estimate_line_items.catalog_snapshot->>'workItemId')::uuid = work_items.id
+      AND estimate_line_items.company_id = ${params.companyId}
+  )`;
+
+  const orderBy =
+    params.sortBy === 'popularity'
+      ? [desc(usageCountExpr), asc(workItems.name)]
+      : [asc(workItems.name)];
+
+  const rows = await tx
+    .select({ item: workItems, usageCount: usageCountExpr })
     .from(workItems)
     .where(and(...conditions))
-    .orderBy(asc(workItems.name))
+    .orderBy(...orderBy)
     .limit(params.limit)
     .offset(params.offset);
 
@@ -177,7 +203,10 @@ export const listItems = async (
     .from(workItems)
     .where(and(...conditions));
 
-  return { items, total: countRow?.value ?? 0 };
+  return {
+    items: rows.map((r) => ({ ...r.item, usageCount: r.usageCount })),
+    total: countRow?.value ?? 0,
+  };
 };
 
 export const findItemById = async (

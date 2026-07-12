@@ -30,7 +30,7 @@ const toCategoryDto = (row: WorkCategory): WorkCategoryDto => ({
   updatedAt: row.updatedAt.toISOString(),
 });
 
-const toItemDto = (row: WorkItem): WorkItemDto => ({
+const toItemDto = (row: WorkItem, usageCount = 0): WorkItemDto => ({
   id: row.id,
   companyId: row.companyId,
   source: row.source,
@@ -43,6 +43,7 @@ const toItemDto = (row: WorkItem): WorkItemDto => ({
   triggerCategoryIds: row.triggerCategoryIds,
   meta: row.meta as Record<string, unknown>,
   isActive: row.isActive,
+  usageCount,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
@@ -129,9 +130,10 @@ export const listItems = async (
     isActive: query.isActive,
     limit: query.limit,
     offset: query.offset,
+    sortBy: query.sortBy,
   });
   return {
-    items: items.map(toItemDto),
+    items: items.map((item) => toItemDto(item, item.usageCount)),
     total,
     limit: query.limit,
     offset: query.offset,

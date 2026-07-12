@@ -151,7 +151,14 @@ type ListProductsParams = {
   isActive?: boolean | undefined;
   limit: number;
   offset: number;
+  // 'name' (default) — алфавитно, для страницы каталога.
+  // 'popularity' — по количеству смет где встречался (COUNT DISTINCT estimate_id),
+  //   потом по имени. Для боковой панели в редакторе сметы: часто добавляемое
+  //   всплывает сверху.
+  sortBy?: 'name' | 'popularity' | undefined;
 };
+
+export type ProductWithUsage = Product & { usageCount: number };
 
 // Substring-поиск по name/sku/brand через ILIKE. Раньше был полнотекстовый
 // to_tsvector/plainto_tsquery — он ищет лексемы целиком, поэтому префикс
@@ -202,13 +209,35 @@ const buildProductConditions = (params: ListProductsParams): SQL[] => {
 export const listProducts = async (
   tx: Db,
   params: ListProductsParams,
-): Promise<{ items: Product[]; total: number }> => {
+): Promise<{ items: ProductWithUsage[]; total: number }> => {
   const conditions = buildProductConditions(params);
-  const items = await tx
-    .select()
+
+  // usage_count = в скольких сметах компании товар когда-либо встречался.
+  // Считаем даже для sortBy='name' — фронту нужен бейджик «часто» независимо
+  // от сортировки. Коррелированный subquery — цена ниже LATERAL join'а на
+  // сотнях товаров, а COUNT(DISTINCT) даёт стабильный смысл: удалил строку
+  // из сметы → count уменьшился, снова добавил → вернулся.
+  // Именуем ссылки на estimate_line_items руками (не через drizzle-заглушки),
+  // чтобы Postgres корректно связал коррелированный «products.id» из внешнего
+  // SELECT'а — иначе drizzle подставлял псевдоним в subquery и корреляция
+  // ломалась (usage_count всегда 0).
+  const usageCountExpr = sql<number>`(
+    SELECT COUNT(DISTINCT estimate_line_items.estimate_id)::int
+    FROM estimate_line_items
+    WHERE estimate_line_items.product_id = products.id
+      AND estimate_line_items.company_id = ${params.companyId}
+  )`;
+
+  const orderBy =
+    params.sortBy === 'popularity'
+      ? [desc(usageCountExpr), asc(products.name)]
+      : [asc(products.name)];
+
+  const rows = await tx
+    .select({ product: products, usageCount: usageCountExpr })
     .from(products)
     .where(and(...conditions))
-    .orderBy(asc(products.name))
+    .orderBy(...orderBy)
     .limit(params.limit)
     .offset(params.offset);
 
@@ -217,7 +246,10 @@ export const listProducts = async (
     .from(products)
     .where(and(...conditions));
 
-  return { items, total: countRow?.value ?? 0 };
+  return {
+    items: rows.map((r) => ({ ...r.product, usageCount: r.usageCount })),
+    total: countRow?.value ?? 0,
+  };
 };
 
 // Стабильный список брендов в scope компании — независимо от текущей страницы.

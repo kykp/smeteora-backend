@@ -44,7 +44,7 @@ const toCategoryDto = (row: ProductCategory): ProductCategoryDto => ({
   updatedAt: row.updatedAt.toISOString(),
 });
 
-const toProductDto = (row: Product): ProductDto => ({
+const toProductDto = (row: Product, usageCount = 0): ProductDto => ({
   id: row.id,
   companyId: row.companyId,
   source: row.source,
@@ -59,6 +59,7 @@ const toProductDto = (row: Product): ProductDto => ({
   kind: row.kind,
   attributes: row.attributes as Record<string, unknown>,
   isActive: row.isActive,
+  usageCount,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
 });
@@ -181,9 +182,10 @@ export const listProducts = async (
     isActive: query.isActive,
     limit: query.limit,
     offset: query.offset,
+    sortBy: query.sortBy,
   });
   return {
-    items: items.map(toProductDto),
+    items: items.map((item) => toProductDto(item, item.usageCount)),
     total,
     limit: query.limit,
     offset: query.offset,
