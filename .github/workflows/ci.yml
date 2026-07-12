@@ -87,6 +87,12 @@ jobs:
       - name: Apply migrations
         run: pnpm db:migrate:test
 
+      # Schema drift = миграция объявлена, но SQL не отработал (был случай
+      # на проде — журнал синкнулся, а колонки не создались). Проверяем сразу
+      # после migrate, чтобы не пропустить в CI.
+      - name: Schema drift audit
+        run: DATABASE_URL_MIGRATOR=$DATABASE_URL_TEST_MIGRATOR pnpm db:audit
+
       - name: Lint
         run: pnpm lint
 

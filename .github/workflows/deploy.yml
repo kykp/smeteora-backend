@@ -102,6 +102,12 @@ jobs:
                cd /opt/smeteora-api
                docker compose -f docker-compose.prod.yml pull
                docker compose -f docker-compose.prod.yml --profile migrate run --rm migrator
+               # Schema drift check: миграции в journal могут числиться
+               # применёнными, а SQL реально не сработать (был инцидент —
+               # 500 на /projects из-за отсутствия колонки client_inn).
+               # Если drift есть — падаем ДО restart backend, старый
+               # контейнер продолжает жить.
+               docker compose -f docker-compose.prod.yml --profile migrate run --rm migrator node dist/src/db/schema-audit.js
                docker compose -f docker-compose.prod.yml up -d --force-recreate backend
                docker compose -f docker-compose.prod.yml ps'
 

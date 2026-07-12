@@ -232,6 +232,13 @@
       "when": 1783834908000,
       "tag": "0032_backfill_line_item_sections",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1783836821000,
+      "tag": "0033_fix_missing_client_columns",
+      "breakpoints": true
     }
   ]
 }
