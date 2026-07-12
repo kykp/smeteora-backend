@@ -233,11 +233,46 @@ export const create = async (
   return assembleTree(tx, ctx, est, sections, []);
 };
 
+// Строки из каталога (product_id≠null) с kind∈{material,work} обязаны лежать
+// в каноническом разделе, соответствующем kind — иначе UI покажет их в чужом
+// табе и юзер будет думать что позиции пропали. Хелпер возвращает раздел
+// куда строка должна попасть; для kind='other'/'service' — «Другое».
+const canonicalTitleForKind = (kind: LineItemKind): 'Оборудование' | 'Монтаж' | 'Другое' => {
+  if (kind === 'work') return 'Монтаж';
+  if (kind === 'material') return 'Оборудование';
+  return 'Другое';
+};
+
+// Валидация при добавлении/обновлении строки: строка из каталога с явным
+// kind='material'|'work' обязана лежать в соответствующем каноническом
+// разделе. Ручные строки (без product_id) и kind='other'/'service' — не
+// проверяем, юзер сам решил куда класть.
+const assertLineFitsCanonicalSection = (params: {
+  sections: Array<{ id: string; title: string }>;
+  sectionId: string;
+  kind: LineItemKind;
+  hasProductId: boolean;
+}): void => {
+  if (!params.hasProductId) return;
+  if (params.kind !== 'material' && params.kind !== 'work') return;
+  const expectedTitle = canonicalTitleForKind(params.kind);
+  const currentSection = params.sections.find((s) => s.id === params.sectionId);
+  if (!currentSection) return;
+  if (currentSection.title !== expectedTitle) {
+    throw new ValidationError(
+      `Позиция kind='${params.kind}' с product_id должна лежать в разделе «${expectedTitle}» (получен «${currentSection.title}»)`,
+    );
+  }
+};
+
 // Гарантирует что в смете ровно три раздела «Оборудование/Монтаж/Другое».
 //   1) Дубликаты по title сливаются в первый (по sortOrder+createdAt): строки
 //      переносятся, дубликаты удаляются.
 //   2) Недостающие разделы создаются с дефолтными наценками из company.
-//   3) Строки с sectionId=null перекладываются в «Другое».
+//   3) Строки с невалидным section_id (null, orphaned на удалённый раздел, или
+//      material/work из каталога попавшие в чужой раздел) перекладываются в
+//      канонический раздел по kind. Ручные строки в «Другом» (product_id=null)
+//      не трогаем.
 // Идемпотентно: повторный вызов на чистой смете ничего не делает.
 const ensureCanonicalSections = async (
   tx: Db,
@@ -306,19 +341,66 @@ const ensureCanonicalSections = async (
     }
   }
 
-  // 3) Строки без sectionId → в «Другое».
-  const otherSection = sections.find((s) => s.title === 'Другое');
-  if (otherSection) {
-    await tx
-      .update(estimateLineItems)
-      .set({ sectionId: otherSection.id })
-      .where(
-        and(
-          eq(estimateLineItems.estimateId, estimateId),
-          eq(estimateLineItems.companyId, ctx.companyId),
-          isNull(estimateLineItems.sectionId),
-        ),
-      );
+  // 3) Автолечение строк с невалидным section_id. Три случая покрываем:
+  //   a) section_id IS NULL — legacy / баг вставки.
+  //   b) section_id ссылается на удалённый раздел (orphaned).
+  //   c) product_id≠NULL + kind∈{material,work} в чужом каноническом разделе
+  //      (например, material с product_id в «Другом» — так у нас юзеры и
+  //      «теряли» позиции). Только с product_id — ручные записи не трогаем.
+  const titleByCanonicalId = new Map<string, string>();
+  for (const s of sections) {
+    if (s.title === 'Оборудование' || s.title === 'Монтаж' || s.title === 'Другое') {
+      titleByCanonicalId.set(s.id, s.title);
+    }
+  }
+  const canonicalIdByTitle = new Map<string, string>();
+  for (const [id, title] of titleByCanonicalId) canonicalIdByTitle.set(title, id);
+
+  const allLines = await repo.listLineItemsByEstimate(tx, {
+    estimateId,
+    companyId: ctx.companyId,
+  });
+  const fixes: Array<{ id: string; sectionId: string }> = [];
+  for (const line of allLines) {
+    const targetTitle = canonicalTitleForKind(line.kind as LineItemKind);
+    const targetId = canonicalIdByTitle.get(targetTitle);
+    if (!targetId) continue;
+
+    // a + b: невалидный / null section_id → по kind.
+    const currentTitle = line.sectionId ? titleByCanonicalId.get(line.sectionId) : null;
+    if (!currentTitle) {
+      if (line.sectionId !== targetId) fixes.push({ id: line.id, sectionId: targetId });
+      continue;
+    }
+
+    // c: строка из каталога в чужом каноническом разделе → по kind.
+    const isCatalogLine = line.productId !== null;
+    const isTypedKind = line.kind === 'material' || line.kind === 'work';
+    if (isCatalogLine && isTypedKind && currentTitle !== targetTitle) {
+      fixes.push({ id: line.id, sectionId: targetId });
+    }
+  }
+  if (fixes.length > 0) {
+    // Батчим по target sectionId — по одному UPDATE на группу, чтобы не
+    // спамить БД сотнями точечных апдейтов на больших сметах.
+    const bySection = new Map<string, string[]>();
+    for (const f of fixes) {
+      const arr = bySection.get(f.sectionId) ?? [];
+      arr.push(f.id);
+      bySection.set(f.sectionId, arr);
+    }
+    for (const [sectionId, ids] of bySection) {
+      await tx
+        .update(estimateLineItems)
+        .set({ sectionId })
+        .where(
+          and(
+            eq(estimateLineItems.estimateId, estimateId),
+            eq(estimateLineItems.companyId, ctx.companyId),
+            inArray(estimateLineItems.id, ids),
+          ),
+        );
+    }
   }
 
   return sections;
@@ -950,7 +1032,9 @@ export const createLineItem = async (
           companyId: ctx.companyId,
         })) + 1;
 
-  // Валидируем sectionId (если задан) — должен существовать в этой смете.
+  // Валидируем sectionId (если задан) — должен существовать в этой смете,
+  // а строка из каталога — лежать в каноническом разделе по kind. Иначе UI
+  // покажет её в чужом табе и юзер решит, что позиции пропали.
   if (body.sectionId != null) {
     const sections = await repo.listSectionsByEstimate(tx, {
       estimateId,
@@ -959,6 +1043,12 @@ export const createLineItem = async (
     if (!sections.some((s) => s.id === body.sectionId)) {
       throw new ValidationError('sectionId не найден в этой смете');
     }
+    assertLineFitsCanonicalSection({
+      sections,
+      sectionId: body.sectionId,
+      kind: (body.kind ?? 'material') as LineItemKind,
+      hasProductId: body.productId != null,
+    });
   }
 
   await repo.insertLineItem(tx, {
@@ -1032,7 +1122,8 @@ export const updateLineItem = async (
   if (body.sortOrder !== undefined) patch.sortOrder = body.sortOrder;
   if (body.meta !== undefined) patch.meta = body.meta;
 
-  // Проверка sectionId на существование, если меняем.
+  // Проверка sectionId на существование + канонический раздел по kind
+  // (тот же инвариант, что в addLineItem).
   if (patch.sectionId != null) {
     const sections = await repo.listSectionsByEstimate(tx, {
       estimateId,
@@ -1041,6 +1132,14 @@ export const updateLineItem = async (
     if (!sections.some((s) => s.id === patch.sectionId)) {
       throw new ValidationError('sectionId не найден в этой смете');
     }
+    const effectiveKind = (patch.kind ?? existing.kind) as LineItemKind;
+    const effectiveProductId = patch.productId !== undefined ? patch.productId : existing.productId;
+    assertLineFitsCanonicalSection({
+      sections,
+      sectionId: patch.sectionId,
+      kind: effectiveKind,
+      hasProductId: effectiveProductId != null,
+    });
   }
 
   const updated = await repo.updateLineItem(tx, {
