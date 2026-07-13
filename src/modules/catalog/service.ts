@@ -34,7 +34,6 @@ const toUnitDto = (row: Unit): UnitDto => ({
 
 const toCategoryDto = (row: ProductCategory): ProductCategoryDto => ({
   id: row.id,
-  companyId: row.companyId,
   source: row.source,
   parentId: row.parentId,
   code: row.code,
@@ -46,7 +45,6 @@ const toCategoryDto = (row: ProductCategory): ProductCategoryDto => ({
 
 const toProductDto = (row: Product, usageCount = 0): ProductDto => ({
   id: row.id,
-  companyId: row.companyId,
   source: row.source,
   categoryId: row.categoryId,
   unitId: row.unitId,

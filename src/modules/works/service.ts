@@ -21,7 +21,6 @@ import {
 
 const toCategoryDto = (row: WorkCategory): WorkCategoryDto => ({
   id: row.id,
-  companyId: row.companyId,
   source: row.source,
   code: row.code,
   name: row.name,
@@ -32,7 +31,6 @@ const toCategoryDto = (row: WorkCategory): WorkCategoryDto => ({
 
 const toItemDto = (row: WorkItem, usageCount = 0): WorkItemDto => ({
   id: row.id,
-  companyId: row.companyId,
   source: row.source,
   categoryId: row.categoryId,
   unitId: row.unitId,

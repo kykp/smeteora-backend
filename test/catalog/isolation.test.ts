@@ -49,7 +49,6 @@ describe('catalog — isolation, roles, sessions, platform-visibility', () => {
     expect(res.statusCode).toBe(201);
     const body = res.json();
     expect(body.source).toBe('company');
-    expect(body.companyId).toBe(a.companyId);
     expect(body.name).toBe('IP-камера 4МП купольная');
     expect(body.sku).toBe('HIK-DS-2CD');
     expect(body.brand).toBe('Hikvision');

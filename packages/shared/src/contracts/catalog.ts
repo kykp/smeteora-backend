@@ -47,9 +47,11 @@ export const CATEGORY_CODE_MAX = 60;
 export const CATEGORY_NAME_MIN = 1;
 export const CATEGORY_NAME_MAX = 200;
 
+// companyId наружу не отдаём — «своя vs платформенная» уже читается через
+// source (CATALOG_SOURCES = 'platform' | 'company'). Клиент своим UUID
+// всё равно бы не мог полезно оперировать (RLS отсекает чужое).
 export const productCategorySchema = z.object({
   id: uuidSchema,
-  companyId: uuidSchema.nullable(), // null = платформенная
   source: z.enum(CATALOG_SOURCES),
   parentId: uuidSchema.nullable(),
   code: z.string().max(CATEGORY_CODE_MAX),
@@ -95,9 +97,9 @@ export const PRODUCT_DESCRIPTION_MAX = 4000;
 export const PRODUCT_LIST_DEFAULT_LIMIT = 40;
 export const PRODUCT_LIST_MAX_LIMIT = 200;
 
+// companyId убран — см. коммент к productCategorySchema.
 export const productSchema = z.object({
   id: uuidSchema,
-  companyId: uuidSchema.nullable(),
   source: z.enum(CATALOG_SOURCES),
   categoryId: uuidSchema,
   unitId: uuidSchema,

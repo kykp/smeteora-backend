@@ -25,9 +25,9 @@ export const WORK_CATEGORY_CODE_MAX = 60;
 export const WORK_CATEGORY_NAME_MIN = 1;
 export const WORK_CATEGORY_NAME_MAX = 200;
 
+// companyId наружу не отдаём — «своя vs платформенная» есть через source.
 export const workCategorySchema = z.object({
   id: uuidSchema,
-  companyId: uuidSchema.nullable(),
   source: z.enum(CATALOG_SOURCES),
   code: z.string().max(WORK_CATEGORY_CODE_MAX),
   name: z.string().min(WORK_CATEGORY_NAME_MIN).max(WORK_CATEGORY_NAME_MAX),
@@ -68,9 +68,9 @@ export const WORK_ITEM_DESCRIPTION_MAX = 4000;
 export const WORK_ITEM_LIST_DEFAULT_LIMIT = 40;
 export const WORK_ITEM_LIST_MAX_LIMIT = 200;
 
+// companyId наружу не отдаём — см. workCategorySchema.
 export const workItemSchema = z.object({
   id: uuidSchema,
-  companyId: uuidSchema.nullable(),
   source: z.enum(CATALOG_SOURCES),
   categoryId: uuidSchema,
   unitId: uuidSchema,

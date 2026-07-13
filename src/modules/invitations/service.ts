@@ -37,7 +37,6 @@ export type AuthMeta = {
 
 const toDto = (row: Invitation): InvitationDto => ({
   id: row.id,
-  companyId: row.companyId,
   email: row.email,
   role: row.role as InvitableRole,
   status: row.status,
@@ -62,11 +61,11 @@ const buildAuthResponse = async (
   if (!active) throw new UnauthorizedError();
   return {
     user: { id: user.id, email: user.email, name: user.name },
-    company: { id: active.companyId, name: active.companyName },
+    company: { name: active.companyName },
     role: active.role,
+    activeMembershipId: active.membershipId,
     memberships: allMemberships.map((m) => ({
       id: m.membershipId,
-      companyId: m.companyId,
       companyName: m.companyName,
       role: m.role,
       isActive: m.status === 'active',

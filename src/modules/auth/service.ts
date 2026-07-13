@@ -33,11 +33,11 @@ export const buildAuthResponse = async (
 
   return {
     user: { id: user.id, email: user.email, name: user.name },
-    company: { id: active.companyId, name: active.companyName },
+    company: { name: active.companyName },
     role: active.role,
+    activeMembershipId: active.membershipId,
     memberships: allMemberships.map((m) => ({
       id: m.membershipId,
-      companyId: m.companyId,
       companyName: m.companyName,
       role: m.role,
       isActive: m.status === 'active',

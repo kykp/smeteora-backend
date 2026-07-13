@@ -29,9 +29,11 @@ const passwordSchema = z
 // В админском ответе показываем всю запись (кроме token_hash). В preview
 // отдельный минимальный DTO — только то что нужно для рендера accept-страницы.
 
+// companyId наружу НЕ отдаём — админ и так знает свою компанию через
+// /auth/me (см. authUserResponseSchema.company), а для инвайти endpoint'ы
+// preview/accept/reject берут companyId сами из token'а.
 export const invitationSchema = z.object({
   id: z.string().uuid(),
-  companyId: z.string().uuid(),
   email: z.string(),
   role: z.enum(INVITABLE_ROLES),
   status: z.enum(INVITATION_STATUSES),

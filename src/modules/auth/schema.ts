@@ -70,7 +70,9 @@ export type ChangePasswordBody = z.infer<typeof changePasswordBodySchema>;
 // ── Responses ──
 
 // Общий ответ на успешный auth-flow — что бы клиент не путался в форматах.
-// company_id наружу НЕ отдаём (нельзя догадываться о существовании чужих компаний).
+// company_id наружу НЕ отдаём (нельзя догадываться о существовании чужих
+// компаний). Активная membership идентифицируется через её id — фронт
+// использует его для switch-company API и для матча при апдейтах.
 export const authUserResponseSchema = z.object({
   user: z.object({
     id: z.string().uuid(),
@@ -78,14 +80,13 @@ export const authUserResponseSchema = z.object({
     name: z.string().nullable(),
   }),
   company: z.object({
-    id: z.string().uuid(),
     name: z.string(),
   }),
   role: z.enum(ROLES),
+  activeMembershipId: z.string().uuid(),
   memberships: z.array(
     z.object({
       id: z.string().uuid(),
-      companyId: z.string().uuid(),
       companyName: z.string(),
       role: z.enum(ROLES),
       isActive: z.boolean(),

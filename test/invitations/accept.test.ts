@@ -123,7 +123,7 @@ describe('invitations — preview + accept (анонимный флоу)', () =>
 
   // ── Accept: новый юзер ──────────────────────────────────────────
   it('POST /invitations/accept — новый юзер: регистрирует + membership + session', async () => {
-    const { token, ownerCompanyId } = await setupCompanyWithInvitation(app, {
+    const { token } = await setupCompanyWithInvitation(app, {
       ownerEmail: 'inviter@ac.com',
       companyName: 'Accept Co',
       inviteeEmail: 'newbie@ac.com',
@@ -144,7 +144,6 @@ describe('invitations — preview + accept (анонимный флоу)', () =>
     const body = res.json();
     expect(body.user.email).toBe('newbie@ac.com');
     expect(body.user.name).toBe('Новичок');
-    expect(body.company.id).toBe(ownerCompanyId);
     expect(body.company.name).toBe('Accept Co');
     expect(body.role).toBe('member');
     expect(body.memberships).toHaveLength(1);
@@ -192,7 +191,7 @@ describe('invitations — preview + accept (анонимный флоу)', () =>
     });
 
     // Другой owner приглашает того же email.
-    const { token, ownerCompanyId } = await setupCompanyWithInvitation(app, {
+    const { token } = await setupCompanyWithInvitation(app, {
       ownerEmail: 'inv@ae.com',
       companyName: 'Second Co',
       inviteeEmail: 'existing@ae.com',
@@ -210,7 +209,6 @@ describe('invitations — preview + accept (анонимный флоу)', () =>
     const body = res.json();
     expect(body.user.email).toBe('existing@ae.com');
     // Активная компания сейчас — вторая (та куда пригласили).
-    expect(body.company.id).toBe(ownerCompanyId);
     expect(body.role).toBe('admin');
     // В memberships должны быть обе компании.
     expect(body.memberships).toHaveLength(2);

@@ -42,7 +42,6 @@ describe('invitations — admin эндпоинты', () => {
     expect(body.invitation.email).toBe('invitee@a.com');
     expect(body.invitation.role).toBe('member');
     expect(body.invitation.status).toBe('pending');
-    expect(body.invitation.companyId).toBe(owner.companyId);
     expect(body.invitation.invitedByUserId).toBe(owner.userId);
     expect(body.token).toMatch(/^[A-Za-z0-9_-]{40,}$/);
     expect(body.acceptUrl).toContain('/accept-invitation?token=');
