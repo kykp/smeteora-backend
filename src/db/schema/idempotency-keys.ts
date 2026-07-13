@@ -1,4 +1,13 @@
-import { pgTable, uuid, text, timestamp, jsonb, integer, index } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  jsonb,
+  integer,
+  index,
+  primaryKey,
+} from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 // Кэш идемпотентности для мутирующих HTTP-запросов. Клиент шлёт заголовок
@@ -7,16 +16,19 @@ import { sql } from 'drizzle-orm';
 // ретрай при таймауте) возвращает сохранённый ответ, ничего не применяя
 // повторно.
 //
-// Не под RLS: ключи содержат ответы разных компаний, но лукап всегда по
-// уникальному uuid — коллизии почти невозможны. Дополнительно храним
-// company_id + user_id для ретеншена и аудита («под кем этот ключ»).
+// Композитный PK (company_id, user_id, key): раньше был PK(key) — если два
+// тенанта случайно/намеренно пришлют один uuid, второй получал бы ответ
+// первого. Плюс включена RLS-политика (миграция 0034) — второй эшелон
+// защиты. lib/idempotency.ts обязан фильтровать SELECT по company_id +
+// user_id (RLS отсечёт cross-company даже при пропущенном условии, но
+// user_id — уровень приложения).
 //
 // Retention: 24 часа хватает под любые сетевые ретраи. Cleanup — фоновая
 // задача (см. src/lib/idempotency.ts).
 export const idempotencyKeys = pgTable(
   'idempotency_keys',
   {
-    key: uuid('key').primaryKey(),
+    key: uuid('key').notNull(),
     companyId: uuid('company_id').notNull(),
     userId: uuid('user_id').notNull(),
     // Метод + путь, чтобы один и тот же ключ не пересекался между разными
@@ -28,7 +40,13 @@ export const idempotencyKeys = pgTable(
     responseBody: jsonb('response_body').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('idempotency_keys_created_idx').on(t.createdAt)],
+  (t) => [
+    primaryKey({
+      name: 'idempotency_keys_pkey',
+      columns: [t.companyId, t.userId, t.key],
+    }),
+    index('idempotency_keys_created_idx').on(t.createdAt),
+  ],
 );
 
 export type IdempotencyKey = typeof idempotencyKeys.$inferSelect;

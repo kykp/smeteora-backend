@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type Db } from '../db/client.js';
@@ -36,10 +36,21 @@ export const withIdempotency = async <T>(
   }
   const key = parsed.data;
 
+  // SELECT scoped по (company_id, user_id, key) — раньше был WHERE key=? и
+  // при коллизии uuid между двумя тенантами один получал бы кэшированный
+  // ответ другого. RLS (миграция 0034) — второй эшелон, но application-level
+  // фильтр по user_id тоже обязателен: внутри одной компании два юзера,
+  // случайно приславшие один uuid, не должны видеть ответы друг друга.
   const existing = await tx
     .select()
     .from(idempotencyKeys)
-    .where(eq(idempotencyKeys.key, key))
+    .where(
+      and(
+        eq(idempotencyKeys.key, key),
+        eq(idempotencyKeys.companyId, ctx.companyId),
+        eq(idempotencyKeys.userId, ctx.userId),
+      ),
+    )
     .limit(1);
 
   const row = existing[0];

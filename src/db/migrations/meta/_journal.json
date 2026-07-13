@@ -239,6 +239,13 @@
       "when": 1783836821000,
       "tag": "0033_fix_missing_client_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1783920000000,
+      "tag": "0034_idempotency_keys_rls",
+      "breakpoints": true
     }
   ]
 }
