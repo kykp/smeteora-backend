@@ -1,4 +1,4 @@
-import { createHash, randomInt } from 'node:crypto';
+import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import { and, count, eq, gt, isNull, sql } from 'drizzle-orm';
 import { type Db } from '../../db/client.js';
 import { emailOtpCodes, type EmailOtpCode } from '../../db/schema/index.js';
@@ -27,6 +27,17 @@ const normalizeEmail = (raw: string): string => raw.trim().toLowerCase();
 // не хэш, а attempts-счётчик + rate-limit + связка (email, code): подобрать
 // «любой активный код» невозможно, только код для конкретного email.
 const hashCode = (code: string): string => createHash('sha256').update(code).digest('hex');
+
+// Constant-time сравнение хэшей: обычный `!==` рано-выходит на первом
+// различающемся символе, что теоретически даёт таймингу leak-канал.
+// timingSafeEqual требует одинаковой длины буферов — sha256 hex всегда 64.
+const codeHashesEqual = (a: string, b: string): boolean => {
+  if (a.length !== b.length) return false;
+  const bufA = Buffer.from(a, 'hex');
+  const bufB = Buffer.from(b, 'hex');
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+};
 
 // 6-значный код с ведущими нулями. randomInt даёт криптостойкую случайность,
 // а String.padStart сохраняет длину для «007123» и подобных.
@@ -125,21 +136,20 @@ export const verifyEmailOtp = async (db: Db, input: VerifyInput): Promise<Verify
       throw new UnauthorizedError('Код недействителен или уже использован');
     }
 
-    if (found.codeHash !== codeHash) {
-      // Промах: инкрементим счётчик. Если превысили лимит — гасим код,
-      // чтобы дальнейшие попытки на этом же email требовали /start.
-      const nextAttempts = found.attempts + 1;
-      if (nextAttempts >= MAX_VERIFY_ATTEMPTS) {
-        await tx
-          .update(emailOtpCodes)
-          .set({ attempts: nextAttempts, usedAt: sql`now()` })
-          .where(eq(emailOtpCodes.id, found.id));
-      } else {
-        await tx
-          .update(emailOtpCodes)
-          .set({ attempts: nextAttempts })
-          .where(eq(emailOtpCodes.id, found.id));
-      }
+    if (!codeHashesEqual(found.codeHash, codeHash)) {
+      // Промах: атомарно инкрементим attempts через UPDATE ... RETURNING —
+      // раньше был read-modify-write (found.attempts + 1), под параллельными
+      // /verify счётчик не рос выше 1 и MAX_VERIFY_ATTEMPTS никогда не
+      // срабатывал. Заодно гасим код на превышении лимита в одном UPDATE.
+      const [row] = await tx
+        .update(emailOtpCodes)
+        .set({
+          attempts: sql`${emailOtpCodes.attempts} + 1`,
+          usedAt: sql`CASE WHEN ${emailOtpCodes.attempts} + 1 >= ${MAX_VERIFY_ATTEMPTS} THEN now() ELSE ${emailOtpCodes.usedAt} END`,
+        })
+        .where(eq(emailOtpCodes.id, found.id))
+        .returning({ attempts: emailOtpCodes.attempts });
+      void row;
       throw new UnauthorizedError('Код недействителен или уже использован');
     }
 
