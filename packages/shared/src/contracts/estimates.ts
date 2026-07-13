@@ -382,11 +382,18 @@ export const treeHeaderPatchSchema = z
   );
 export type TreeHeaderPatch = z.infer<typeof treeHeaderPatchSchema>;
 
+// Потолки размера дерева — защита от memory DoS: раньше массивы были
+// без .max(), а bodyLimit Fastify — 1MB, что даёт ~10k пустых элементов
+// на PUT /tree; синхронный diff + zod superRefine на этом легко забивают
+// event loop. Реальные сметы редко превышают несколько сотен строк.
+const MAX_TREE_SECTIONS = 200;
+const MAX_TREE_LINE_ITEMS = 5000;
+
 export const upsertTreeBodySchema = z
   .object({
     estimate: treeHeaderPatchSchema.optional(),
-    sections: z.array(treeSectionInputSchema),
-    lineItems: z.array(treeLineItemInputSchema),
+    sections: z.array(treeSectionInputSchema).max(MAX_TREE_SECTIONS),
+    lineItems: z.array(treeLineItemInputSchema).max(MAX_TREE_LINE_ITEMS),
   })
   .superRefine((body, ctx) => {
     // Дубли id по секциям.

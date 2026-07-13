@@ -125,9 +125,14 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
   // If-Match обязателен по UX — иначе параллельный автосейв из другой вкладки
   // молча стирает правки. Опциональность сохранена ради обратной совместимости
   // с легаси-клиентами, но новый фронт всегда шлёт header.
+  //
+  // bodyLimit 2 МБ — потолок сверху, дополняет .max() на массивы в
+  // upsertTreeBodySchema. Дефолт Fastify 1 МБ мал: большие сметы (200
+  // разделов × ≤5000 позиций со snapshot'ами) реально бывают ~1.5 МБ.
   app.put(
     '/:id/tree',
     {
+      bodyLimit: 2 * 1024 * 1024,
       schema: {
         params: estimateIdParamSchema,
         body: upsertTreeBodySchema,
