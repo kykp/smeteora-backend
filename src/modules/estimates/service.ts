@@ -1150,6 +1150,23 @@ export const updateLineItem = async (
   });
   if (!updated) throw new NotFoundError('Позиция сметы не найдена');
 
+  // Синхронизация авто-работ при изменении quantity товара. Работает только
+  // если строка — товар из каталога (material + productId + productCategoryId
+  // в snapshot). Дельта > 0 → autoLink (умеет инкрементировать существующие
+  // авто-работы), дельта < 0 → unlink.
+  const productCategoryId = readSnapshotProductCategoryId(existing.catalogSnapshot);
+  const isCatalogMaterial = existing.kind === 'material' && existing.productId != null;
+  if (isCatalogMaterial && productCategoryId && patch.quantity !== undefined) {
+    const oldQty = Number(existing.quantity) || 0;
+    const newQty = Number(patch.quantity) || 0;
+    const delta = newQty - oldQty;
+    if (delta > 0) {
+      await autoLinkWorkItems(tx, ctx, estimateId, productCategoryId, delta.toString());
+    } else if (delta < 0) {
+      await unlinkAutoWorkItems(tx, ctx, estimateId, productCategoryId, (-delta).toString());
+    }
+  }
+
   return getTree(tx, ctx, estimateId);
 };
 
@@ -1160,6 +1177,17 @@ export const deleteLineItem = async (
   lineId: string,
   expectedVersion: number | null,
 ): Promise<EstimateTreeResponse> => {
+  // Читаем строку заранее — нужны kind/product/qty/snapshot чтобы после
+  // удаления откатить авто-привязанные работы (симметрия autoLinkWorkItems).
+  const existing = await repo.findLineItemById(tx, {
+    id: lineId,
+    estimateId,
+    companyId: ctx.companyId,
+  });
+  if (!existing) throw new NotFoundError('Позиция сметы не найдена');
+
+  await bumpOrThrow(tx, ctx, estimateId, expectedVersion);
+
   const ok = await repo.deleteLineItem(tx, {
     id: lineId,
     estimateId,
@@ -1167,7 +1195,11 @@ export const deleteLineItem = async (
   });
   if (!ok) throw new NotFoundError('Позиция сметы не найдена');
 
-  await bumpOrThrow(tx, ctx, estimateId, expectedVersion);
+  const productCategoryId = readSnapshotProductCategoryId(existing.catalogSnapshot);
+  if (existing.kind === 'material' && existing.productId != null && productCategoryId) {
+    await unlinkAutoWorkItems(tx, ctx, estimateId, productCategoryId, existing.quantity);
+  }
+
   return getTree(tx, ctx, estimateId);
 };
 
@@ -1565,6 +1597,61 @@ const autoLinkWorkItems = async (
       meta: { autoLinked: true, triggeredByCategoryId: productCategoryId },
     });
     nextSortOrder += 1;
+  }
+};
+
+// Симметрия autoLinkWorkItems: юзер уменьшил qty товара / удалил его совсем
+// → авто-работа этой категории тоже должна ужаться / удалиться.
+// Трогаем только строки-работы с meta.autoLinked=true и совпадающим
+// triggeredByCategoryId — руками вбитая работа с тем же именем остаётся.
+const unlinkAutoWorkItems = async (
+  tx: Db,
+  ctx: { companyId: string },
+  estimateId: string,
+  productCategoryId: string,
+  delta: string,
+): Promise<void> => {
+  const deltaNum = Number(delta);
+  if (!Number.isFinite(deltaNum) || deltaNum <= 0) return;
+
+  const workItems = await worksRepo.listItemsTriggeredByCategory(tx, {
+    companyId: ctx.companyId,
+    productCategoryId,
+  });
+  if (workItems.length === 0) return;
+  const workIds = new Set(workItems.map((w) => w.id));
+
+  const existingItems = await repo.listLineItemsByEstimate(tx, {
+    estimateId,
+    companyId: ctx.companyId,
+  });
+  const toDelete: string[] = [];
+  for (const li of existingItems) {
+    if (li.kind !== 'work') continue;
+    const meta = li.meta as Record<string, unknown> | null;
+    if (!meta || meta['autoLinked'] !== true) continue;
+    if (meta['triggeredByCategoryId'] !== productCategoryId) continue;
+    const snap = li.catalogSnapshot as Record<string, unknown> | null;
+    const wid = snap?.['workItemId'];
+    if (typeof wid !== 'string' || !workIds.has(wid)) continue;
+
+    const currentQty = Number(li.quantity) || 0;
+    const newQty = currentQty - deltaNum;
+    if (newQty <= 0) {
+      toDelete.push(li.id);
+      continue;
+    }
+    await tx
+      .update(estimateLineItems)
+      .set({ quantity: newQty.toString() })
+      .where(and(eq(estimateLineItems.id, li.id), eq(estimateLineItems.companyId, ctx.companyId)));
+  }
+  if (toDelete.length > 0) {
+    await repo.deleteLineItems(tx, {
+      estimateId,
+      companyId: ctx.companyId,
+      ids: toDelete,
+    });
   }
 };
 
