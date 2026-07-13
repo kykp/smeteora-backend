@@ -452,7 +452,7 @@ const buildDefaultSections = (
 
 export const getTree = async (
   tx: Db,
-  ctx: { companyId: string },
+  ctx: { companyId: string; role?: string },
   id: string,
 ): Promise<EstimateTreeResponse> => {
   const est = await repo.findEstimateById(tx, { id, companyId: ctx.companyId });
@@ -463,9 +463,15 @@ export const getTree = async (
     companyId: ctx.companyId,
   });
 
-  // Self-healing для смет, созданных до появления автосоздания разделов
-  // или пострадавших от ранних версий этого healing'а (создавших дубликаты).
-  sections = await ensureCanonicalSections(tx, ctx, est.id, sections);
+  // Self-healing legacy-смет (отсутствие канонических разделов, orphan
+  // section_id). Вызывается ТОЛЬКО когда роль позволяет запись — viewer
+  // не должен через GET триггерить UPDATE/INSERT (write-on-GET open только
+  // для member/admin/owner). Параллельные GET'ы под одной сессией
+  // безопасны — операции идемпотентные.
+  const canWrite = ctx.role === undefined || ctx.role !== 'viewer';
+  if (canWrite) {
+    sections = await ensureCanonicalSections(tx, ctx, est.id, sections);
+  }
 
   const items = await repo.listLineItemsByEstimate(tx, {
     estimateId: est.id,
