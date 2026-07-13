@@ -39,15 +39,29 @@ declare module 'fastify' {
   }
 }
 
+// При добавлении нового чувствительного поля (secret, credential, session id)
+// сразу заводим сюда. Раньше не были покрыты otp/code/apiKey/x-api-key и
+// invitation-token — при LOG_LEVEL=debug эти значения светились в стриме.
 const REDACT_PATHS = [
+  // Заголовки
   'req.headers.authorization',
   'req.headers.cookie',
   'req.headers["set-cookie"]',
+  'req.headers["x-api-key"]',
+  'req.headers["x-csrf-token"]',
+  'res.headers["set-cookie"]',
+  // Пароли
   'req.body.password',
   'req.body.currentPassword',
   'req.body.newPassword',
+  // OTP + одноразовые коды
+  'req.body.otp',
+  'req.body.code',
+  // Токены и ключи
   'req.body.token',
-  'res.headers["set-cookie"]',
+  'req.body.apiKey',
+  'req.body.secret',
+  'req.body.newSecret',
 ] as const;
 
 const API_V1_PREFIX = '/api/v1';
