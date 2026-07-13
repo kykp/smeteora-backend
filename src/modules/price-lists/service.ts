@@ -116,6 +116,12 @@ export const parsePriceList = async (
     source === 'xlsx'
       ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       : 'text/csv';
+  // TODO: storage.save идёт ВНУТРИ request.tx — соединение висит
+  // idle-in-transaction пока S3/локальный диск пишет multi-MB блоб.
+  // Правильный fix: вынести save за пределы tx (либо через двухфазную
+  // выкатку — сначала save, потом short-tx с insertUpload; либо через
+  // pre-generated stub row в БД + фоновая заливка). Требует переработки
+  // routes-слоя (сейчас handler получает готовый tx через preHandler).
   await storage.save(storageKey, input.buffer, { contentType });
 
   await repo.insertUpload(tx, {

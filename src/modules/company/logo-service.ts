@@ -45,20 +45,18 @@ export const uploadLogo = async (
   // Сохраняем сначала в storage — если БД upsert упадёт, у нас останется висячий
   // файл (orphan), но у пользователя логотип не поменяется. Обратный порядок
   // хуже: сохранил в БД, файл записать не смог → в БД ключ на несуществующий файл.
-  const oldMeta = await repo.findLogoMeta(tx, params.companyId);
+  //
+  // ВАЖНО: раньше здесь удаляли старый файл oldMeta.logoKey ещё до COMMIT'а
+  // текущей транзакции. При rollback COMMIT'а (сбой соединения, deadlock) БД
+  // откатывалась на старый ключ, а файла уже не было — 404 на GET /logo.
+  // Теперь удаление старого файла отложено — orphan почистит фоновый
+  // scheduled job (TODO: реализовать `cleanupOrphanLogos` — сравнить set
+  // ключей в БД с реальным содержимым S3 и вычистить лишние).
   await storage.save(key, params.data, { contentType: params.contentType });
   await repo.patch(tx, params.companyId, {
     logoKey: key,
     logoContentType: params.contentType,
   });
-  if (oldMeta) {
-    // Best-effort уборка старого файла. Ошибку не пробрасываем — БД уже обновлена.
-    try {
-      await storage.delete(oldMeta.logoKey);
-    } catch {
-      // Ignore — orphan будет.
-    }
-  }
 };
 
 // Прочитать логотип. Возвращает бинарник + Content-Type для отдачи клиенту.
@@ -84,17 +82,15 @@ export const readLogo = async (
 };
 
 // Удалить логотип. Идемпотентно: если логотипа не было — 200 всё равно.
+// Файл в storage не удаляется прямо здесь — та же причина что в uploadLogo
+// (rollback COMMIT'а → БД снова указывает на удалённый файл). Orphan почистит
+// scheduled job.
 export const deleteLogo = async (
   tx: Db,
-  storage: FileStorage,
+  _storage: FileStorage,
   companyId: string,
 ): Promise<void> => {
   const meta = await repo.findLogoMeta(tx, companyId);
   if (!meta) return;
   await repo.patch(tx, companyId, { logoKey: null, logoContentType: null });
-  try {
-    await storage.delete(meta.logoKey);
-  } catch {
-    // Игнорим — БД уже без ссылки.
-  }
 };
