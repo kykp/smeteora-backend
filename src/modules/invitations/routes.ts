@@ -79,15 +79,16 @@ export const invitationsRoutes: FastifyPluginAsyncZod = async (app) => {
         frontendUrl,
       });
 
-      // В dev-режиме дублируем accept-URL в логе — удобно тыкать не заходя в
-      // тело ответа. В prod URL уходит только в ответе (в HTTP-body, потом
-      // фронт отправит его почтой/копипастом получателю).
+      // ВНИМАНИЕ: acceptUrl содержит однократный токен, дающий право
+      // присоединиться к компании. В логи он НЕ должен попадать — любой с
+      // read-доступом к логам (Loki/journalctl/pino output) до его истечения
+      // (7 дней) сможет принять приглашение за приглашённого. Раньше здесь
+      // был `acceptUrl: result.acceptUrl` — снесено.
       request.log.info(
         {
           invitationId: result.invitation.id,
           email: result.invitation.email,
           role: result.invitation.role,
-          acceptUrl: result.acceptUrl,
         },
         'приглашение создано',
       );
