@@ -11,6 +11,16 @@
 #   .env          — параметры бэка: DATABASE_URL, SESSION_SECRET, CORS_ORIGIN, COOKIE_DOMAIN...
 #   .env.postgres — POSTGRES_USER/PASSWORD/DB + пароли трёх ролей приложения.
 # Оба файла лежат в /opt/smeteora-api/ на сервере с правами 600 owner smeteora.
+#
+# Ротация логов: у всех сервисов явный json-file driver с max-size + max-file,
+# иначе дефолтный json-file без ротации → за месяцы прод-логов забиваем root
+# раздел VPS и падает Postgres.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
 
 services:
   postgres:
@@ -21,6 +31,7 @@ services:
     volumes:
       - /opt/smeteora-api/pg_data:/var/lib/postgresql/data
       - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/10-init-roles.sh:ro
+    logging: *default-logging
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
       interval: 5s
@@ -41,6 +52,7 @@ services:
       # Файлы (логотипы и пр.) переживают recreate контейнера.
       # На хосте /opt/smeteora-api/data должна быть с owner uid 1000 (юзер node).
       - /opt/smeteora-api/data:/app/data
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,6 +63,7 @@ services:
     image: ghcr.io/kykp/smeteora-backend:latest
     profiles: ['migrate']
     env_file: .env
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
