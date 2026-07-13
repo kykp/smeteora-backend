@@ -79,7 +79,11 @@ export const listActiveMembershipsForUser = async (
     })
     .from(memberships)
     .innerJoin(companies, eq(memberships.companyId, companies.id))
-    .where(and(eq(memberships.userId, userId), isNull(companies.deletedAt)));
+    .where(and(eq(memberships.userId, userId), isNull(companies.deletedAt)))
+    // Явный ORDER BY: login/OAuth/OTP берут usable[0] как дефолтную компанию,
+    // без ORDER BY порядок строк неопределён и юзер с ≥2 memberships
+    // попадает в разные компании между входами.
+    .orderBy(memberships.createdAt);
   return rows;
 };
 
