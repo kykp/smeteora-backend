@@ -59,7 +59,13 @@ export const register = async (
   // Одной транзакцией: user + company + owner-membership + session.
   return runWithoutCompanyContext(db, async (tx) => {
     const existing = await repo.findUserByEmail(tx, params.email);
-    if (existing) throw new ConflictError('Пользователь с таким email уже существует');
+    if (existing) {
+      // Enumeration-риск известен: 409 подтверждает существование email'а.
+      // Полное устранение требует email-verification-flow (юзер получает
+      // письмо «на ваш адрес пытались зарегистрироваться»), пока не сделан.
+      // Rate-limit /register (см. routes.ts) ограничивает злоупотребление.
+      throw new ConflictError('Пользователь с таким email уже существует');
+    }
 
     const passwordHash = await hashPassword(params.password);
     const user = await repo.insertUser(tx, {
@@ -116,8 +122,12 @@ export const login = async (
     const activeMemberships = await repo.listActiveMembershipsForUser(tx, user.id);
     const usable = activeMemberships.filter((m) => m.status === 'active');
     if (usable.length === 0) {
-      // Есть учётка, но во всех компаниях membership disabled → нельзя войти никуда.
-      throw new UnauthorizedError('Учётная запись отключена');
+      // Есть учётка, но все memberships disabled. Сообщение НЕ отличается от
+      // «неверный email или пароль» — иначе перебор кинутых сотрудников
+      // становится тривиальным (одно сообщение подтверждает существование
+      // аккаунта). Настоящую причину показывать безопасно только через
+      // «forgot-password»-flow с email-верификацией.
+      throw new UnauthorizedError('Неверный email или пароль');
     }
 
     // Первый доступный по времени создания — простое дефолтное правило.
