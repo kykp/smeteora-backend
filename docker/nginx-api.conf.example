@@ -6,6 +6,9 @@
 # certbot автоматически впишет строки ssl_certificate / ssl_certificate_key
 # и настроит редирект с http на https.
 
+# Убираем nginx-версию из Server-header и error-страниц.
+server_tokens off;
+
 server {
     listen 80;
     server_name api.smeteora.ru;
@@ -29,9 +32,17 @@ server {
     error_log  /var/log/nginx/api.smeteora.ru.error.log;
 
     # Security headers дублируются в самом Fastify через @fastify/helmet,
-    # но nginx добавляет вторую линию для случаев когда бэк не отвечает.
+    # но nginx добавляет вторую линию для случаев когда бэк не отвечает
+    # (502/504/timeout — Fastify до этих ответов не доходит).
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # HSTS — форсированный HTTPS на год + preload. Убеждаемся что все
+    # клиенты (и nginx-error-pages) точно ходят по https после первого визита.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    # API не должен встраиваться в iframe (не HTML, но защита на всякий случай).
+    add_header X-Frame-Options "DENY" always;
+    # Небольшая защита от MIME-sniffing атак через CORS-контекст.
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
 
     # Body limit — для будущих upload'ов прайс-листов.
     # Пока держим скромно; поднимем когда появится ingestion.
