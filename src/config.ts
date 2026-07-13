@@ -62,6 +62,14 @@ const configSchema = z
     // Сколько минут живёт код. Короче чем у magic-link, потому что юзер
     // держит вкладку открытой и вводит код сразу, а не откладывает на позже.
     EMAIL_OTP_TTL_MINUTES: z.coerce.number().int().positive().default(10),
+
+    // ── Feedback → Telegram ──
+    // Прокси-эндпоинт POST /api/v1/feedback шлёт обращение в Telegram.
+    // Оба значения ЖИВУТ ТОЛЬКО НА БЭКЕ — раньше токен уходил на клиент
+    // через VITE_TG_BOT_TOKEN и был публичен в бандле. Если хотя бы одно
+    // не задано, эндпоинт отвечает 400 «канал не настроен».
+    TG_BOT_TOKEN: z.string().min(1).optional(),
+    TG_CHAT_ID: z.string().min(1).optional(),
   })
   .superRefine((cfg, ctx) => {
     const yandex = [
