@@ -1154,7 +1154,9 @@ export const updateLineItem = async (
   // если строка — товар из каталога (material + productId + productCategoryId
   // в snapshot). Дельта > 0 → autoLink (умеет инкрементировать существующие
   // авто-работы), дельта < 0 → unlink.
-  const productCategoryId = readSnapshotProductCategoryId(existing.catalogSnapshot);
+  const productCategoryId = readSnapshotProductCategoryId(
+    existing.catalogSnapshot as Record<string, unknown> | null,
+  );
   const isCatalogMaterial = existing.kind === 'material' && existing.productId != null;
   if (isCatalogMaterial && productCategoryId && patch.quantity !== undefined) {
     const oldQty = Number(existing.quantity) || 0;
@@ -1195,7 +1197,9 @@ export const deleteLineItem = async (
   });
   if (!ok) throw new NotFoundError('Позиция сметы не найдена');
 
-  const productCategoryId = readSnapshotProductCategoryId(existing.catalogSnapshot);
+  const productCategoryId = readSnapshotProductCategoryId(
+    existing.catalogSnapshot as Record<string, unknown> | null,
+  );
   if (existing.kind === 'material' && existing.productId != null && productCategoryId) {
     await unlinkAutoWorkItems(tx, ctx, estimateId, productCategoryId, existing.quantity);
   }
@@ -1630,7 +1634,13 @@ const unlinkAutoWorkItems = async (
     if (li.kind !== 'work') continue;
     const meta = li.meta as Record<string, unknown> | null;
     if (!meta || meta['autoLinked'] !== true) continue;
-    if (meta['triggeredByCategoryId'] !== productCategoryId) continue;
+    // Раньше здесь была проверка meta.triggeredByCategoryId === productCategoryId,
+    // но у work_item может быть массив триггеров (trigger_category_ids), а в
+    // meta сохраняется только первая категория из которой работа впервые
+    // прилетела. Итог: работа с триггерами [video, audio], инкрементированная
+    // сначала video, потом audio — при удалении audio не находилась и qty
+    // висел мёртвым грузом. workIds (listItemsTriggeredByCategory) уже фильтрует
+    // work_items по актуальным триггерам категории, доп. проверка меты избыточна.
     const snap = li.catalogSnapshot as Record<string, unknown> | null;
     const wid = snap?.['workItemId'];
     if (typeof wid !== 'string' || !workIds.has(wid)) continue;
