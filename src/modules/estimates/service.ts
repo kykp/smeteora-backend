@@ -490,10 +490,19 @@ export const upsertTree = async (
   tx: Db,
   ctx: { companyId: string },
   id: string,
+  expectedVersion: number | null,
   body: UpsertTreeBody,
 ): Promise<EstimateTreeResponse> => {
   const est = await repo.findEstimateById(tx, { id, companyId: ctx.companyId });
   if (!est) throw new NotFoundError('Смета не найдена');
+
+  // OCC-проверка ДО каких-либо мутаций дерева: если If-Match не совпадает,
+  // возвращаем 409 без побочных эффектов. bumpOrThrow ниже (в конце функции)
+  // финализирует бамп версии — если версия к тому моменту уже успела уйти
+  // вперёд из-за конкурентной мутации, тот bumpOrThrow тоже упадёт 409.
+  if (expectedVersion !== null && est.version !== expectedVersion) {
+    throwVersionConflict(est.version);
+  }
 
   const currentSections = await repo.listSectionsByEstimate(tx, {
     estimateId: est.id,
@@ -604,8 +613,10 @@ export const upsertTree = async (
     updatedEstimate = updated;
   }
 
-  // Инкрементируем version — любая мутация дерева бампает шапку.
-  await bumpOrThrow(tx, ctx, est.id, null);
+  // Финальный bump. expectedVersion уже сверен выше — здесь bumpOrThrow(null)
+  // просто инкрементирует, но остаётся защитой от конкурентной мутации,
+  // проскочившей между двумя SELECT'ами (падёт 409, если версия уехала).
+  await bumpOrThrow(tx, ctx, est.id, expectedVersion);
 
   // Возвращаем актуальное дерево из БД (не из памяти) — чтобы фронт получил
   // финальные createdAt/updatedAt/companyId + рассчитанные суммы + свежий version.
@@ -631,6 +642,7 @@ export const updateHeader = async (
   tx: Db,
   ctx: { companyId: string },
   id: string,
+  expectedVersion: number | null,
   body: UpdateEstimateBody,
 ): Promise<EstimateTreeResponse> => {
   const est = await repo.findEstimateById(tx, { id, companyId: ctx.companyId });
@@ -674,7 +686,7 @@ export const updateHeader = async (
     await applyModeRepricing(tx, ctx, est.id, patch.mode);
   }
 
-  await bumpOrThrow(tx, ctx, est.id, null);
+  await bumpOrThrow(tx, ctx, est.id, expectedVersion);
 
   const refreshed = await repo.findEstimateById(tx, { id: est.id, companyId: ctx.companyId });
   if (!refreshed) throw new NotFoundError('Смета не найдена');
@@ -692,7 +704,12 @@ export const softDelete = async (
   tx: Db,
   ctx: { companyId: string; userId: string; sessionId: string },
   id: string,
+  expectedVersion: number | null,
 ): Promise<void> => {
+  // Проверка версии ДО soft-delete через bumpOrThrow — если If-Match не совпадает,
+  // 409 без каких-либо изменений. Лишний UPDATE version в удаляемой смете
+  // безобиден (сама смета уходит в deleted_at следующим шагом).
+  await bumpOrThrow(tx, ctx, id, expectedVersion);
   const ok = await repo.softDeleteEstimate(tx, { id, companyId: ctx.companyId });
   if (!ok) throw new NotFoundError('Смета не найдена');
   await writeAudit(tx, {
@@ -716,9 +733,16 @@ export const duplicate = async (
   tx: Db,
   ctx: { companyId: string; membershipId: string; userId: string; sessionId: string },
   sourceId: string,
+  expectedVersion: number | null,
 ): Promise<EstimateTreeResponse> => {
   const src = await repo.findEstimateById(tx, { id: sourceId, companyId: ctx.companyId });
   if (!src) throw new NotFoundError('Смета не найдена');
+
+  // If-Match проверяем на СМЕТЕ-ИСТОЧНИКЕ: юзер не должен дублировать стейл-
+  // версию (если её кто-то поменял между «Открыл» и «Дублировать»).
+  if (expectedVersion !== null && src.version !== expectedVersion) {
+    throwVersionConflict(src.version);
+  }
 
   const newTitle = `${src.title} (копия)`;
   const newEst = await repo.insertEstimate(tx, {
@@ -821,6 +845,7 @@ const setStatus = async (
   tx: Db,
   ctx: { companyId: string },
   id: string,
+  expectedVersion: number | null,
   guard: (est: Estimate) => void,
   toStatus: EstimateStatus,
 ): Promise<EstimateTreeResponse> => {
@@ -835,7 +860,7 @@ const setStatus = async (
   });
   if (!row) throw new NotFoundError('Смета не найдена');
 
-  await bumpOrThrow(tx, ctx, id, null);
+  await bumpOrThrow(tx, ctx, id, expectedVersion);
   const refreshed = await repo.findEstimateById(tx, { id, companyId: ctx.companyId });
   if (!refreshed) throw new NotFoundError('Смета не найдена');
 
@@ -851,11 +876,13 @@ export const archive = (
   tx: Db,
   ctx: { companyId: string },
   id: string,
+  expectedVersion: number | null,
 ): Promise<EstimateTreeResponse> =>
   setStatus(
     tx,
     ctx,
     id,
+    expectedVersion,
     (est) => {
       if (est.status === 'archived') {
         throw new ConflictError('Смета уже в архиве');
@@ -868,11 +895,13 @@ export const unarchive = (
   tx: Db,
   ctx: { companyId: string },
   id: string,
+  expectedVersion: number | null,
 ): Promise<EstimateTreeResponse> =>
   setStatus(
     tx,
     ctx,
     id,
+    expectedVersion,
     (est) => {
       if (est.status !== 'archived') {
         throw new ConflictError('Смета не в архиве');

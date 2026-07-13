@@ -99,6 +99,8 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
 
   // ── PATCH /estimates/:id ────────────────────────────────────────
   // Частичное обновление шапки (title/notes/…) без пересборки дерева.
+  // If-Match опциональный: если клиент прислал — сверяем с текущей version
+  // и падаем 409 при рассогласовании (защита от параллельных правок).
   app.patch(
     '/:id',
     {
@@ -113,12 +115,16 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) => {
       const ctx = assertCtx(request.ctx);
       const tx = assertTx(request.tx);
-      return service.updateHeader(tx, ctx, request.params.id, request.body);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      return service.updateHeader(tx, ctx, request.params.id, expectedVersion, request.body);
     },
   );
 
   // ── PUT /estimates/:id/tree ─────────────────────────────────────
   // Полный tree-upsert: клиент шлёт целое дерево, сервер diff'ит и применяет.
+  // If-Match обязателен по UX — иначе параллельный автосейв из другой вкладки
+  // молча стирает правки. Опциональность сохранена ради обратной совместимости
+  // с легаси-клиентами, но новый фронт всегда шлёт header.
   app.put(
     '/:id/tree',
     {
@@ -133,7 +139,8 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) => {
       const ctx = assertCtx(request.ctx);
       const tx = assertTx(request.tx);
-      return service.upsertTree(tx, ctx, request.params.id, request.body);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      return service.upsertTree(tx, ctx, request.params.id, expectedVersion, request.body);
     },
   );
 
@@ -151,7 +158,8 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) => {
       const ctx = assertCtx(request.ctx);
       const tx = assertTx(request.tx);
-      return service.archive(tx, ctx, request.params.id);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      return service.archive(tx, ctx, request.params.id, expectedVersion);
     },
   );
 
@@ -169,7 +177,8 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) => {
       const ctx = assertCtx(request.ctx);
       const tx = assertTx(request.tx);
-      return service.unarchive(tx, ctx, request.params.id);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      return service.unarchive(tx, ctx, request.params.id, expectedVersion);
     },
   );
 
@@ -187,7 +196,8 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) => {
       const ctx = assertCtx(request.ctx);
       const tx = assertTx(request.tx);
-      await service.softDelete(tx, ctx, request.params.id);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      await service.softDelete(tx, ctx, request.params.id, expectedVersion);
       return { ok: true as const };
     },
   );
@@ -196,6 +206,7 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
   // Полная копия сметы с текущими настройками и составом. Новая смета —
   // всегда draft, version=1. Возвращает свежее дерево копии, чтобы фронт
   // сразу перешёл на её id без второго запроса.
+  // If-Match проверяется на СМЕТЕ-ИСТОЧНИКЕ.
   app.post(
     '/:id/duplicate',
     {
@@ -209,7 +220,8 @@ export const estimatesRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request, reply) => {
       const ctx = assertCtx(request.ctx);
       const tx = assertTx(request.tx);
-      const copy = await service.duplicate(tx, ctx, request.params.id);
+      const expectedVersion = parseIfMatch(request.headers['if-match'] as string | undefined);
+      const copy = await service.duplicate(tx, ctx, request.params.id, expectedVersion);
       void reply.status(201);
       return copy;
     },
